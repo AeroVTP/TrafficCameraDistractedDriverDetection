@@ -1,7 +1,7 @@
 //======================================================================================================
 // Name        : TrafficCameraDistractedDriverDetection.cpp
 // Author      : Vidur Prasad
-// Version     : 0.3.0
+// Version     : 0.4.0
 // Copyright   : Institute for the Development and Commercialization of Advanced Sensor Technology Inc.
 // Description : Detect Drunk, Distracted, and Anomalous Driving Using Traffic Cameras
 //======================================================================================================
@@ -51,6 +51,8 @@ using namespace std;
 vector <Mat> globalFrames;
 vector <Mat> globalGrayFrames;
 
+vector <Point> detectedCoordinates;
+
 CvHaarClassifierCascade *cascade;
 CvMemStorage  *storage;
 
@@ -61,6 +63,7 @@ BackgroundSubtractorMOG bckSubMOG; // (200,  1, .7, 15);
 //global frame properties
 int FRAME_HEIGHT;
 int FRAME_WIDTH;
+int FRAME_RATE;
 
 //global counter
 int i = 0;
@@ -71,6 +74,10 @@ int medianColorImageCompletion = 0;
 int opticalFlowThreadCompletion = 0;
 int opticalFlowAnalysisObjectDetectionThreadCompletion = 0;
 int gaussianMixtureModelCompletion = 0;
+int vibeDetectionGlobalFrameCompletion = 0;
+int mogDetection1GlobalFrameCompletion = 0;
+int mogDetection2GlobalFrameCompletion = 0;
+int medianDetectionGlobalFrameCompletion = 0;
 
 //background subtraction models
 Ptr<BackgroundSubtractorGMG> backgroundSubtractorGMM = Algorithm::create<BackgroundSubtractorGMG>("BackgroundSubtractor.GMG");
@@ -85,6 +92,7 @@ Mat gmmFrame;
 
 //matrix holding vibe frame
 Mat vibeBckFrame;
+Mat vibeDetectionGlobalFrame;
  
 //matrix storing GMM canny
 Mat cannyGMM;
@@ -92,8 +100,15 @@ Mat cannyGMM;
 //matrix storing OFA thresh operations
 Mat ofaThreshFrame;
 
+//Mat to hold Mog1 frame
+Mat mogDetection1GlobalFrame;
+
+//Mat to hold Mog2 frame
+Mat mogDetection2GlobalFrame;
+
 //Mat objects to hold background frames
 Mat backgroundFrameMedian;
+Mat medianDetectionGlobalFrame;
 
 //Mat for color background frame
 Mat backgroundFrameColorMedian;
@@ -136,6 +151,9 @@ bool useMedians = true;
 //const char* filename = "assets/xmlTrainingVideoSet2.mp4";
 //const char* filename = "assets/videoAndrewGithub.mp4";
 const char* filename = "assets/froggerHighwayTCheck.mp4";
+//const char* filename = "assets/OrangeHDStockFootageHighway72010FPSTCheck.mp4";
+//const char* filename = "assets/trafficStockCountryRoad16Seconds30FPSTCheck.mp4";
+//const char* filename = "assets/cityCarsTraffic3LanesStreetRoadJunctionPond5TCheck15FPSTCheck.mp4";
 
 //defining format of data sent to threads 
 struct thread_data{
@@ -144,9 +162,9 @@ struct thread_data{
 };	
 
 //function prototypes
-Mat slidingWindowDetector(Mat srcFrame, int numRowSections, int numColumnSections);
 Mat slidingWindowNeighborDetector(Mat srcFrame, int numRowSections, int numColumnSections);
 Mat cannyContourDetector(Mat srcFrame);
+void fillCoordinates(vector <Point2f> detectedCoordinates);
 
 //method to display frame
 void displayFrame(string filename, Mat matToDisplay)
@@ -159,8 +177,9 @@ void displayFrame(string filename, Mat matToDisplay)
 //method to display frame overriding debug
 void displayFrame(string filename, Mat matToDisplay, bool override)
 {
-	//if override and Mat is not empty
-	if(override && matToDisplay.size[0] != 0){namedWindow(filename); imshow(filename, matToDisplay);}
+	//if override and Mat is not emptys
+	if(override && matToDisplay.size[0] != 0 && filename != "Welcome"){ imshow(filename, matToDisplay);}
+	else if(override && matToDisplay.size[0] != 0){namedWindow(filename); imshow(filename, matToDisplay);}
 }
 
 //method to draw optical flow, only should be called during demos
@@ -356,8 +375,10 @@ void *computeOpticalFlowAnalysisObjectDetection(void *threadarg)
 	struct opticalFlowThreadData *data;
 	data = (struct opticalFlowThreadData *) threadarg;
 
+	Mat ofaObjectDetection; 
+
 	//deep copy grayscale frame
-	globalGrayFrames.at(i-1).copyTo(thresholdFrameOFA);
+	globalGrayFrames.at(i-1).copyTo(ofaObjectDetection);
 
 	//set threshold
 	const double threshold = 10000;
@@ -373,26 +394,26 @@ void *computeOpticalFlowAnalysisObjectDetection(void *threadarg)
 			if((sqrt((abs(fxy.x) * abs(fxy.y))) * 10000) > threshold)
 			{
 				//write to binary image
-				thresholdFrameOFA.at<uchar>(j,a) = 255;
+				ofaObjectDetection.at<uchar>(j,a) = 255;
 			}
 			else
 			{
 				//write to binary image
-				thresholdFrameOFA.at<uchar>(j,a) = 0;
+				ofaObjectDetection.at<uchar>(j,a) = 0;
 			}
 		}
 	}
 
 	//performing sWND
-	displayFrame("OFAOBJ pre" , thresholdFrameOFA );
-	thresholdFrameOFA = slidingWindowNeighborDetector(thresholdFrameOFA, thresholdFrameOFA.rows / 10, thresholdFrameOFA.cols / 20);
-	displayFrame("sWNDFrame1" , thresholdFrameOFA );
-	thresholdFrameOFA = slidingWindowNeighborDetector(thresholdFrameOFA, thresholdFrameOFA.rows / 20, thresholdFrameOFA.cols / 40);
-	displayFrame("sWNDFrame2" , thresholdFrameOFA );
-	thresholdFrameOFA = slidingWindowNeighborDetector(thresholdFrameOFA, thresholdFrameOFA.rows / 30, thresholdFrameOFA.cols / 60);
-	displayFrame("sWNDFrame3" , thresholdFrameOFA );
-	thresholdFrameOFA = cannyContourDetector(thresholdFrameOFA);
-	displayFrame("sWNDFrameCanny" , thresholdFrameOFA );
+	displayFrame("OFAOBJ pre" , ofaObjectDetection );
+	ofaObjectDetection = slidingWindowNeighborDetector(ofaObjectDetection, ofaObjectDetection.rows / 10, ofaObjectDetection.cols / 20);
+	displayFrame("sWNDFrame1" , ofaObjectDetection );
+	ofaObjectDetection = slidingWindowNeighborDetector(ofaObjectDetection, ofaObjectDetection.rows / 20, ofaObjectDetection.cols / 40);
+	displayFrame("sWNDFrame2" , ofaObjectDetection );
+	ofaObjectDetection = slidingWindowNeighborDetector(ofaObjectDetection, ofaObjectDetection.rows / 30, ofaObjectDetection.cols / 60);
+	displayFrame("sWNDFrame3" , ofaObjectDetection );
+	thresholdFrameOFA = cannyContourDetector(ofaObjectDetection);
+	displayFrame("sWNDFrameCanny" , thresholdFrameOFA); 
 
 	//signal thread completion
    	opticalFlowAnalysisObjectDetectionThreadCompletion = 1;
@@ -413,11 +434,6 @@ void opticalFlowAnalysisObjectDetection(Mat& cflowmap, Mat& flow)
 	//creating optical flow object thread
 	pthread_create(&opticalFlowAnalysisObjectDetectionThread, NULL, computeOpticalFlowAnalysisObjectDetection, (void *)&threadData);
 
-	//wait for completion
-	while(opticalFlowAnalysisObjectDetectionThreadCompletion == 0) {}
-
-	//reset completion variable
-	opticalFlowAnalysisObjectDetectionThreadCompletion = 0;
 }
 
 //method to perform optical flow analysis
@@ -469,10 +485,141 @@ void *computeOpticalFlowAnalysisThread(void *threadarg)
 		drawOptFlowMap(flow, cflow, 1.5, Scalar(0, 0, 255));
 	}
 
-	//signal thread completion
-	opticalFlowThreadCompletion = 1;
-	
+	//wait for completion
+	while(opticalFlowAnalysisObjectDetectionThreadCompletion != 1){}
+
+	//wait for completion
+	opticalFlowAnalysisObjectDetectionThreadCompletion = 0;
+
+	opticalFlowThreadCompletion = 1;	
 }
+
+
+//method to do background subtraction with MOG2 
+Mat bgMog2(bool buffer)
+{
+
+	//instantiating Mat objects
+	Mat fgmaskShadow;
+	Mat frameToResizeShadow;
+	
+ 	//copying into tmp variable
+ 	globalFrames[i].copyTo(frameToResizeShadow);
+ 
+ 	//performing background subtraction 
+	pMOG2Shadow->operator()(frameToResizeShadow , fgmaskShadow, .01);
+
+	//performing sWND
+	displayFrame("fgmaskShadow" , fgmaskShadow);
+	Mat fgmaskShadowSWND = slidingWindowNeighborDetector(fgmaskShadow, fgmaskShadow.rows/10, fgmaskShadow.cols/20);
+	displayFrame("fgmaskShadowSWND", fgmaskShadowSWND); 
+
+	fgmaskShadowSWND = slidingWindowNeighborDetector(fgmaskShadowSWND, fgmaskShadowSWND.rows/20, fgmaskShadowSWND.cols/40);
+	displayFrame("fgmaskShadowSWND2", fgmaskShadowSWND);
+
+	//performing canny
+	Mat fgMaskShadowSWNDCanny = cannyContourDetector(fgmaskShadowSWND);
+	displayFrame("fgMaskShadowSWNDCanny2", fgMaskShadowSWNDCanny);
+
+	//returning processed frame
+	return fgMaskShadowSWNDCanny;
+}
+
+//method to perform vibe background subtraction
+Mat vibeBackgroundSubtraction(bool buffer)
+{
+	//instantiating Mat frame object
+	Mat sWNDVibeCanny;
+
+	//if done buffering
+	if(i == bufferMemory)
+	{
+		//instantiating Mat frame object
+		Mat resizedFrame;
+		
+		//saving current frame
+		globalFrames[i].copyTo(resizedFrame);
+ 
+ 		//initializing model
+ 		bgfg.init_model(resizedFrame);
+
+ 		//return tmp frame
+		return resizedFrame;
+	}
+
+	else
+	{
+
+		//instantiating Mat frame object
+		Mat resizedFrame;
+
+		//saving current frame
+		globalFrames[i].copyTo(resizedFrame); 
+
+		//processing model
+		vibeBckFrame = *bgfg.fg(resizedFrame);
+
+		displayFrame("vibeBckFrame", vibeBckFrame); 
+
+		//performing sWND
+		Mat sWNDVibe = slidingWindowNeighborDetector(vibeBckFrame, vibeBckFrame.rows/10, vibeBckFrame.cols/20);
+		displayFrame("sWNDVibe1", sWNDVibe); 
+
+		//performing sWND
+		sWNDVibe = slidingWindowNeighborDetector(vibeBckFrame, vibeBckFrame.rows/20, vibeBckFrame.cols/40);
+		displayFrame("sWNDVibe2", sWNDVibe); 
+
+		//performing canny
+		Mat sWNDVibeCanny = cannyContourDetector(sWNDVibe);
+		displayFrame("sWNDVibeCannycanny2", sWNDVibeCanny);
+	}
+
+	//returning processed frame
+	return sWNDVibeCanny;
+}
+
+
+//method to do background subtraction with MOG 1
+Mat bgMog(bool buffer)
+{
+
+	//instantiating Mat objects
+	Mat fgmask;
+	Mat bck;
+	Mat fgMaskSWNDCanny;
+	Mat fgmaskSWND;
+
+	//performing background subtraction
+    bckSubMOG.operator()(globalFrames.at(i), fgmask, .01); //1.0 / 200);
+
+	if(!buffer)
+	{ 
+		displayFrame("MOG Fg MAsk", fgmask);
+ 		//displayFrame("RCFrame", globalFrames[i]);
+
+		cout << " df" << endl;
+ 		//performing sWND
+		fgmaskSWND = slidingWindowNeighborDetector(fgmask, fgmask.rows/10, fgmask.cols/20);
+		//displayFrame("fgmaskSWND", fgmaskSWND);
+ 			cout << "here" << endl;
+
+		fgmaskSWND = slidingWindowNeighborDetector(fgmaskSWND, fgmaskSWND.rows/20, fgmaskSWND.cols/40);
+		//displayFrame("fgmaskSWNDSWND2", fgmaskSWND);
+
+		fgmaskSWND = slidingWindowNeighborDetector(fgmaskSWND, fgmaskSWND.rows/30, fgmaskSWND.cols/60);
+		//displayFrame("fgmaskSWNDSWND3", fgmaskSWND);
+
+		//performing canny
+		fgMaskSWNDCanny = cannyContourDetector(fgmaskSWND);
+		//displayFrame("fgMaskSWNDCanny2", fgMaskSWNDCanny);
+	}
+
+
+
+	//return canny
+	return fgMaskSWNDCanny;
+}
+
 
 //method to handle OFA thread
 Mat opticalFlowFarneback()
@@ -489,6 +636,10 @@ Mat opticalFlowFarneback()
 
 	//create OFA thread
 	pthread_create(&opticalFlowFarneback, NULL, computeOpticalFlowAnalysisThread, (void *)&threadData);
+	
+	while(opticalFlowThreadCompletion != 1){}
+
+	opticalFlowThreadCompletion = 0;
 
 	return thresholdFrameOFA;
 }
@@ -701,8 +852,7 @@ void *calcMedianImage(void *threadarg)
 	   }
 
 	   //display percentage completed
-	   if(debug)
-		   cout << ((activeCounter / displayPercentageCounter) * 100) << "% Median Image Scanned" << endl;
+ 	   cout << ((activeCounter / displayPercentageCounter) * 100) << "% Median Image Scanned" << endl;
 
 	}
 
@@ -763,7 +913,7 @@ Mat thresholdFrame(Mat sourceDiffFrame, const int threshold)
 	}
 
 	//perform morphology
-	thresholdFrame = morph(thresholdFrame, 1, "closing");
+	//thresholdFrame = morph(thresholdFrame, 1, "closing");
 
 	//return thresholded frame
 	return thresholdFrame;
@@ -772,12 +922,12 @@ Mat thresholdFrame(Mat sourceDiffFrame, const int threshold)
 //method to perform simple image subtraction
 Mat imageSubtraction()
 {
-	//subtract frames
+  	//subtract frames
 	Mat tmpStore  =  globalGrayFrames[i] - backgroundFrameMedian;
-	displayFrame("Raw imgSub", tmpStore);
 
-	//threshold frames
-	tmpStore = thresholdFrame(tmpStore, 8);
+	displayFrame("Raw imgSub", tmpStore);
+ 	//threshold frames
+	tmpStore = thresholdFrame(tmpStore, 50);
 	displayFrame("Thresh imgSub", tmpStore);
 
 	//perform sWND
@@ -898,7 +1048,7 @@ Mat gaussianMixtureModel()
 void generateBackgroundImage(int FRAME_RATE)
 {
 	//if post-processing
-	if(readMedianImg || !useMedians)
+	if(readMedianImg && useMedians)
 	{
 		//read median image
 		backgroundFrameMedian = imread("medianIMG.jpg");
@@ -914,14 +1064,22 @@ void generateBackgroundImage(int FRAME_RATE)
 		if(i == bufferMemory && useMedians)
 		{ 
  			grayScaleFrameMedian();
+
+ 			while(medianImageCompletion != 1) {}
 		}
 		//every 3 minutes
 		if (i % (FRAME_RATE * 180) == 0 && i > 0)
 		{
 			//calculate new medians
  			grayScaleFrameMedian();
+
+ 			while(medianImageCompletion != 1) {}
+
 		}
 	}
+
+
+	medianImageCompletion = 0;
 }
 
 //method to draw canny contours
@@ -929,6 +1087,7 @@ Mat cannyContourDetector(Mat srcFrame)
 {
 	//threshold for non-car objects or noise
 	const int thresholdNoiseSize = 200;
+	const int misDetectLargeSize = 600;
 
 	//instantiating Mat and Canny objects
 	Mat canny;
@@ -958,82 +1117,17 @@ Mat cannyContourDetector(Mat srcFrame)
  	for(int v = 0; v < contours.size(); v++)
 	{
 		//if large enough to be object
-  		if(arcLength(contours[v], true) > thresholdNoiseSize)
+  		if(arcLength(contours[v], true) > thresholdNoiseSize && arcLength(contours[v], true)  < misDetectLargeSize)
  		{
  			//draw object and circle center point
 			drawContours( drawing, contours, v, Scalar(254,254,0), 2, 8, hierarchy, 0, Point() );
 			circle( drawing, mc[v], 4, Scalar(254, 254, 0), -1, 8, 0 );
+			fillCoordinates(mc);
  		}
  	}
 
  	//return image with contours
 	return drawing;
-}
-
-//method to do background subtraction with MOG 1
-Mat bgMog(bool buffer)
-{
-
-	//instantiating Mat objects
-	Mat fgmask;
-	Mat bck;
-	Mat fgMaskSWNDCanny;
-
-	//performing background subtraction
-    bckSubMOG.operator()(globalFrames.at(i), fgmask, .01); //1.0 / 200);
-	
-	if(!buffer)
-	{ 
-		displayFrame("MOG Fg MAsk", fgmask);
- 		displayFrame("RCFrame", globalFrames[i]);
-
- 		//performing sWND
-		Mat fgmaskSWND = slidingWindowNeighborDetector(fgmask, fgmask.rows/10, fgmask.cols/20);
-		displayFrame("fgmaskSWND", fgmaskSWND);
- 
-		fgmaskSWND = slidingWindowNeighborDetector(fgmaskSWND, fgmaskSWND.rows/20, fgmaskSWND.cols/40);
-		displayFrame("fgmaskSWNDSWND2", fgmaskSWND);
-
-		fgmaskSWND = slidingWindowNeighborDetector(fgmaskSWND, fgmaskSWND.rows/30, fgmaskSWND.cols/60);
-		displayFrame("fgmaskSWNDSWND3", fgmaskSWND);
-
-		//performing canny
-		fgMaskSWNDCanny = cannyContourDetector(fgmaskSWND);
-		displayFrame("fgMaskSWNDCanny2", fgMaskSWNDCanny);
-	}
-
-	//return canny
-	return fgMaskSWNDCanny;
-}
-
-//method to do background subtraction with MOG2 
-Mat bgMog2(bool buffer)
-{
-
-	//instantiating Mat objects
-	Mat fgmaskShadow;
-	Mat frameToResizeShadow;
-	
- 	//copying into tmp variable
- 	globalFrames[i].copyTo(frameToResizeShadow);
- 
- 	//performing background subtraction 
-	pMOG2Shadow->operator()(frameToResizeShadow , fgmaskShadow, .01);
-
-	//performing sWND
-	displayFrame("fgmaskShadow" , fgmaskShadow);
-	Mat fgmaskShadowSWND = slidingWindowNeighborDetector(fgmaskShadow, fgmaskShadow.rows/10, fgmaskShadow.cols/20);
-	displayFrame("fgmaskShadowSWND", fgmaskShadowSWND); 
-
-	fgmaskShadowSWND = slidingWindowNeighborDetector(fgmaskShadowSWND, fgmaskShadowSWND.rows/20, fgmaskShadowSWND.cols/40);
-	displayFrame("fgmaskShadowSWND2", fgmaskShadowSWND);
-
-	//performing canny
-	Mat fgMaskShadowSWNDCanny = cannyContourDetector(fgmaskShadowSWND);
-	displayFrame("fgMaskShadowSWNDCanny2", fgMaskShadowSWNDCanny);
-
-	//returning processed frame
-	return fgMaskShadowSWNDCanny;
 }
 
 //method to perform proximity density search to remove noise and identify noise
@@ -1046,6 +1140,25 @@ Mat slidingWindowNeighborDetector(Mat sourceFrame, int numRowSections, int numCo
 		numRowSections = sourceFrame.rows / 10;
 		numColumnSections = sourceFrame.cols / 20;
 	} 
+
+	/*
+
+	double numRowSectionsDouble = numRowSections;
+	double numColumnSectionsDouble = numColumnSections;
+
+	while(sourceFrame.rows % numRowSections != 0)
+	{
+		numRowSections++;
+		numRowSectionsDouble = numRowSections;
+	}
+
+	while(sourceFrame.cols % numColumnSections != 0)
+	{
+		numColumnSections++;
+		numColumnSectionsDouble = numColumnSections;
+	}
+
+	*/
 
 	//declaring percentage to calculate density
 	double percentage = 0;
@@ -1108,9 +1221,23 @@ Mat slidingWindowNeighborDetector(Mat sourceFrame, int numRowSections, int numCo
  	return destinationFrame;
 }
 
-//method to perform vibe background subtraction
-Mat vibeBackgroundSubtraction(bool buffer)
+
+//method to handle median image subtraction
+Mat medianImageSubtraction(int FRAME_RATE)
 {
+	//generate or read background image
+	generateBackgroundImage(FRAME_RATE);
+
+	//calculate image difference and return
+	return imageSubtraction();
+}
+
+//method to perform vibe background subtraction
+void *computeVibeBackgroundThread(void *threadarg)
+{
+	struct thread_data *data;
+	data = (struct thread_data *) threadarg;
+
 	//instantiating Mat frame object
 	Mat sWNDVibeCanny;
 
@@ -1127,12 +1254,13 @@ Mat vibeBackgroundSubtraction(bool buffer)
  		bgfg.init_model(resizedFrame);
 
  		//return tmp frame
-		return resizedFrame;
+ 		vibeDetectionGlobalFrame = sWNDVibeCanny;
+
+ 		vibeDetectionGlobalFrameCompletion = 1;
 	}
 
 	else
 	{
-
 		//instantiating Mat frame object
 		Mat resizedFrame;
 
@@ -1155,42 +1283,357 @@ Mat vibeBackgroundSubtraction(bool buffer)
 		//performing canny
 		Mat sWNDVibeCanny = cannyContourDetector(sWNDVibe);
 		displayFrame("sWNDVibeCannycanny2", sWNDVibeCanny);
-	}
 
-	//returning processed frame
-	return sWNDVibeCanny;
+
+	//saving processed frame
+	vibeDetectionGlobalFrame = sWNDVibeCanny;
+
+	//signalling completion
+	vibeDetectionGlobalFrameCompletion = 1;
+	}
 }
 
-//method to handle median image subtraction
-Mat medianImageSubtraction(int FRAME_RATE)
+void vibeBackgroundSubtractionThreadHandler(bool buffer)
 {
+	//instantiating multithread object
+	pthread_t vibeBackgroundSubtractionThread;
+	
+	//instantiating multithread Data object
+	struct thread_data threadData;		
+
+	//saving data into data object
+	threadData.data = i;
+
+	//creating threads
+	int vibeBackgroundThreadRC = pthread_create(&vibeBackgroundSubtractionThread, NULL, computeVibeBackgroundThread, (void *)&threadData);	
+}
+
+//method to do background subtraction with MOG 1
+void *computeBgMog1(void *threadarg)
+{
+	struct thread_data *data;
+	data = (struct thread_data *) threadarg;
+
+	//instantiating Mat objects
+	Mat fgmask;
+	Mat bck;
+	Mat fgMaskSWNDCanny;
+
+	//performing background subtraction
+    bckSubMOG.operator()(globalFrames.at(i), fgmask, .01); //1.0 / 200);
+
+	displayFrame("MOG Fg MAsk", fgmask);
+	displayFrame("RCFrame", globalFrames[i]);
+
+	//performing sWND
+	Mat fgmaskSWND = slidingWindowNeighborDetector(fgmask, fgmask.rows/10, fgmask.cols/20);
+	displayFrame("fgmaskSWND", fgmaskSWND);
+
+	fgmaskSWND = slidingWindowNeighborDetector(fgmaskSWND, fgmaskSWND.rows/20, fgmaskSWND.cols/40);
+	displayFrame("fgmaskSWNDSWND2", fgmaskSWND);
+
+	fgmaskSWND = slidingWindowNeighborDetector(fgmaskSWND, fgmaskSWND.rows/30, fgmaskSWND.cols/60);
+	displayFrame("fgmaskSWNDSWND3", fgmaskSWND);
+
+	//performing canny
+	fgMaskSWNDCanny = cannyContourDetector(fgmaskSWND);
+	displayFrame("fgMaskSWNDCanny2", fgMaskSWNDCanny);
+
+	//return canny
+	mogDetection1GlobalFrame = fgMaskSWNDCanny;
+
+	//signal completion
+	mogDetection1GlobalFrameCompletion = 1;
+}
+
+
+void mogDetectionThreadHandler(bool buffer)
+{
+	//instantiating multithread object
+	pthread_t mogDetectionThread;
+	
+	//instantiating multithread Data object
+	struct thread_data threadData;		
+
+	//saving data into data object
+	threadData.data = i;
+
+	//creating threads
+	int mogDetectionThreadRC = pthread_create(&mogDetectionThread, NULL, computeBgMog1, (void *)&threadData);	
+}
+
+//method to do background subtraction with MOG 1
+void *computeBgMog2(void *threadarg)
+{
+	struct thread_data *data;
+	data = (struct thread_data *) threadarg;
+
+	//instantiating Mat objects
+	Mat fgmaskShadow;
+	Mat frameToResizeShadow;
+	
+ 	//copying into tmp variable
+ 	globalFrames[i].copyTo(frameToResizeShadow);
+ 
+ 	//performing background subtraction 
+	pMOG2Shadow->operator()(frameToResizeShadow , fgmaskShadow, .01);
+
+	//performing sWND
+	displayFrame("fgmaskShadow" , fgmaskShadow);
+	Mat fgmaskShadowSWND = slidingWindowNeighborDetector(fgmaskShadow, fgmaskShadow.rows/10, fgmaskShadow.cols/20);
+	displayFrame("fgmaskShadowSWND", fgmaskShadowSWND); 
+
+	fgmaskShadowSWND = slidingWindowNeighborDetector(fgmaskShadowSWND, fgmaskShadowSWND.rows/20, fgmaskShadowSWND.cols/40);
+	displayFrame("fgmaskShadowSWND2", fgmaskShadowSWND);
+
+	//performing canny
+	Mat fgMaskShadowSWNDCanny = cannyContourDetector(fgmaskShadowSWND);
+	displayFrame("fgMaskShadowSWNDCanny2", fgMaskShadowSWNDCanny);
+ 
+	//return canny
+	mogDetection2GlobalFrame = fgMaskShadowSWNDCanny;
+
+	//signal completion
+	mogDetection2GlobalFrameCompletion = 1;
+}
+
+void mogDetection2ThreadHandler(bool buffer)
+{
+	//instantiating multithread object
+	pthread_t mogDetection2Thread;
+	
+	//instantiating multithread Data object
+	struct thread_data threadData;		
+
+	//saving data into data object
+	threadData.data = i;
+
+	//creating threads
+	int mogDetection2ThreadRC = pthread_create(&mogDetection2Thread, NULL, computeBgMog2, (void *)&threadData);
+}
+
+
+//method to handle median image subtraction
+void *computeMedianDetection(void *threadarg)
+{
+	struct thread_data *data;
+	data = (struct thread_data *) threadarg;
+	int tmp = data->data;
+
+	medianDetectionGlobalFrame = medianImageSubtraction(FRAME_RATE);
+
+	/*
 	//generate or read background image
 	generateBackgroundImage(FRAME_RATE);
 
-	//calculate image difference and return
-	return imageSubtraction();
+	//calculate image difference and save to global
+	medianDetectionGlobalFrame = imageSubtraction();
+	*/
+
+	medianDetectionGlobalFrameCompletion = 1;
+ }
+
+void medianDetectionThreadHandler(int FRAME_RATE)
+{
+	//instantiating multithread object
+	pthread_t medianDetectionThread;
+	
+	//instantiating multithread Data object
+	struct thread_data threadData;		
+
+	//saving data into data object
+	threadData.data = FRAME_RATE;
+
+	//creating threads
+	int medianDetectionThreadRC = pthread_create(&medianDetectionThread, NULL, computeMedianDetection, (void *)&threadData);
 }
+
 
 //method to handle all image processing object detection
 void objectDetection(int FRAME_RATE)
 {
-	//save all methods vehicle canny outputs
-	Mat vibeDetection =	vibeBackgroundSubtraction(false);
-	Mat mogDetection1 = bgMog(false);
-	Mat mogDetection2 = bgMog2(false);
-	Mat gmmDetection = gaussianMixtureModel();
-	Mat medianDetection = medianImageSubtraction(FRAME_RATE);
-	Mat ofaDetection = opticalFlowFarneback();
+ 	//save all methods vehicle canny outputs
+ 	Mat gmmDetection = gaussianMixtureModel();
 
-	//override display all frames
-  	displayFrame("vibeDetection", vibeDetection, true);
-  	displayFrame("mogDetection1", mogDetection1, true); 
- 	displayFrame("mogDetection2", mogDetection2, true); 
- 	displayFrame("gmmDetection", gmmDetection, true); 
- 	displayFrame("medianDetection", medianDetection, true); 
- 	displayFrame("ofaDetection", ofaDetection, true); 
- 	displayFrame("Raw Frame", globalFrames[i], true);
+	//Mat tmpMedian = medianImageSubtraction(FRAME_RATE);
+
+	Mat ofaDetection = opticalFlowFarneback();
+ 
+	//Mat ofaDetection;
+	//vibeDetectionGlobalFrame = vibeBackgroundSubtraction(false);
+ 	//Mat tmpMOG1 =  bgMog(false);
+	//Mat tmpMOG2 = bgMog2(false); 
+
+	//opticalFlowFarneback();
+ 	vibeBackgroundSubtractionThreadHandler(false);
+ 	mogDetectionThreadHandler(false);
+ 	mogDetection2ThreadHandler(false);
+ 	medianDetectionThreadHandler(FRAME_RATE);
+
+  	bool firstTimeMedianImage = true;
+ 	bool firstTimeVibe = true;
+ 	bool firstTimeMOG1 = true;
+ 	bool firstTimeMOG2 = true;
+ 	bool enterOnce = true;
+
+ 	Mat tmpMedian;
+ 	Mat tmpVibe;
+ 	Mat tmpMOG1;
+ 	Mat tmpMOG2;
+
+ 	/*
+	while(medianDetectionGlobalFrameCompletion != 1||
+ 		vibeDetectionGlobalFrameCompletion != 1||
+		mogDetection1GlobalFrameCompletion != 1||
+		mogDetection2GlobalFrameCompletion != 1 ||
+		enterOnce
+		)
+	*/
+
+ 	bool finishedMedian = false;
+ 	bool finishedVibe = false;
+ 	bool finishedMOG1 = false;
+ 	bool finishedMOG2 = false;
+
+	while(!finishedMedian ||
+			!finishedVibe ||
+			!finishedMOG1||
+			!finishedMOG2 ||
+			enterOnce
+			)
+	{
+ 		enterOnce = false;
+
+		if(firstTimeMedianImage && medianDetectionGlobalFrameCompletion == 1 )
+		{
+			tmpMedian = medianDetectionGlobalFrame;
+			displayFrame("medianDetection", tmpMedian, true);
+			firstTimeMedianImage = false;
+			finishedMedian = true;
+		}
+		if(firstTimeVibe && vibeDetectionGlobalFrameCompletion == 1 )
+		{
+			tmpVibe = vibeDetectionGlobalFrame;
+			displayFrame("vibeDetection", tmpVibe, true);
+			firstTimeVibe = false;
+			finishedVibe = true;
+		}
+		if(firstTimeMOG1 && mogDetection1GlobalFrameCompletion == 1 )
+		{
+			tmpMOG1= mogDetection1GlobalFrame;
+			displayFrame("mogDetection1", tmpMOG1, true);
+			firstTimeMOG1 = false;
+			finishedMOG1 = true;
+		}
+		if(firstTimeMOG2 && mogDetection2GlobalFrameCompletion == 1)
+		{
+			tmpMOG2 = mogDetection2GlobalFrame;
+			displayFrame("mogDetection2", tmpMOG2, true);
+			firstTimeMOG2 = false;
+			finishedMOG2 = true;
+		}
+ 	}
+ 	
+	vibeDetectionGlobalFrameCompletion = 0;
+	mogDetection1GlobalFrameCompletion = 0;
+	mogDetection2GlobalFrameCompletion = 0;
+ 	medianDetectionGlobalFrameCompletion = 0;
+
+ 	/*
+	displayFrame("vibeDetection", tmpVibe, true);
+	displayFrame("mogDetection1", tmpMOG1, true);
+	displayFrame("mogDetection2", tmpMOG2, true);
+	displayFrame("medianDetection", tmpMedian, true);
+	*/
+
+	displayFrame("gmmDetection", gmmDetection, true);
+	displayFrame("ofaDetection", ofaDetection, true);
+	displayFrame("Raw Frame", globalFrames[i], true);
+
+ 	waitKey(30);
+
+  	if(i > bufferMemory + 5 && tmpMOG1.channels() == 3 && tmpMOG2.channels() == 3 && ofaDetection.channels() == 3 && tmpMedian.channels() == 3)
+ 	{
+  		if(i > bufferMemory * 2)
+  		{
+  			Mat combined = tmpMOG1 +  tmpMOG2 + ofaDetection + tmpMedian + tmpVibe + gmmDetection;
+			displayFrame("Combined Contours", combined, true);
+
+			double beta = ( 1.0 - .5 );
+			addWeighted( combined, .5, globalFrames[i], beta, 0.0, combined);
+			displayFrame("Overlay", combined, true);
+  		}
+  		else
+  		{
+			Mat combined = tmpMOG1 +  tmpMOG2 + ofaDetection + tmpMedian;
+			displayFrame("Combined Contours", combined, true);
+
+			double beta = ( 1.0 - .5 );
+			addWeighted( combined, .5, globalFrames[i], beta, 0.0, combined);
+			displayFrame("Overlay", combined, true);
+  		}
+ 	}
+
+ 	else
+ 	{
+ 		cout << "Sync Issue" << endl;
+ 	}
+
 }
+
+void fillCoordinates(vector <Point2f> detectedCoordinatesMoments)
+{
+ 	for(int v = 0; v < detectedCoordinatesMoments.size(); v++)
+	{
+		Point tmpPoint ((int) detectedCoordinatesMoments[v].x,  (int) detectedCoordinatesMoments[v].y);
+
+		if((tmpPoint.x > 10 && tmpPoint.x < globalGrayFrames[i].cols - 10) &&
+				(tmpPoint.y > 10 && tmpPoint.y < globalGrayFrames[i].rows - 10))
+ 		{
+			detectedCoordinates.push_back(tmpPoint);
+ 		}
+ 	}
+}
+
+void displayCoordinates(vector <Point> coordinatesToDisplay)
+{
+ 	for(int v = 0; v < coordinatesToDisplay.size(); v++)
+	{
+		//cout << "(" << coordinatesToDisplay[v].x << "," << coordinatesToDisplay[v].y << ")" << endl;
+	}
+}
+
+void drawCoordinates(vector <Point> coordinatesToDisplay)
+{
+	//Mat tmpToDraw;
+
+	//globalFrames[i].copyTo(tmpToDraw);
+
+	Mat tmpToDraw = Mat::zeros( globalFrames[i].size(), CV_8UC1);
+
+	/*
+	for(int v = 0; v < tmpToDraw.rows * 1; v++)
+	{
+		for(int j = 0; j < tmpToDraw.cols; j++)
+		{
+			tmpToDraw.at<uchar>(v,j) = 0;
+		}
+	}
+	*/
+
+	for(int v = 0; v < coordinatesToDisplay.size(); v++)
+	{
+		circle( tmpToDraw, coordinatesToDisplay[v], 4, Scalar(254, 254, 0), -1, 8, 0 );
+	}
+
+	displayFrame("Coordinates to Display", tmpToDraw, true);
+}
+
+void trackingML()
+{
+ 	displayCoordinates(detectedCoordinates);
+	drawCoordinates(detectedCoordinates);
+ }
 
 //method to initalize Mats on startup
 void initilizeMat()
@@ -1238,8 +1681,7 @@ bool processExit(VideoCapture capture, clock_t t1, char keyboardClick)
 //while buffering
 void buffer()
 {
-	bgMog(true);
- }
+}
 
 //main method
 int main() {
@@ -1261,7 +1703,7 @@ int main() {
 	//collecting statistics about the video
 	//constants that will not change
 	const int NUMBER_OF_FRAMES =(int) capture.get(CV_CAP_PROP_FRAME_COUNT);
-	const int FRAME_RATE = (int) capture.get(CV_CAP_PROP_FPS);
+	FRAME_RATE = (int) capture.get(CV_CAP_PROP_FPS);
 	FRAME_WIDTH = capture.get(CV_CAP_PROP_FRAME_WIDTH);
 	FRAME_HEIGHT = capture.get(CV_CAP_PROP_FRAME_HEIGHT);
 
@@ -1372,13 +1814,16 @@ int main() {
 		//running computer vision
 		objectDetection(FRAME_RATE); 
 
+		trackingML();
+
 		//display frame number
-		if(!debug)
-			cout << "Currently processing frame number " << i << "." << endl;
+		cout << "Currently processing frame number " << i << "." << endl;
 
 		//method to process exit
 		//if(processExit(capture,  t1, keyboardClick))
 			//return 0;
+
+		detectedCoordinates.erase(detectedCoordinates.begin(), detectedCoordinates.end());
 
 		//deleting current frame from RAM
    		delete frameToBeDisplayed;

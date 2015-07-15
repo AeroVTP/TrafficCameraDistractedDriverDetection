@@ -1,4 +1,123 @@
 
+//method to do background subtraction with MOG2 
+Mat bgMog2(bool buffer)
+{
+
+	//instantiating Mat objects
+	Mat fgmaskShadow;
+	Mat frameToResizeShadow;
+	
+ 	//copying into tmp variable
+ 	globalFrames[i].copyTo(frameToResizeShadow);
+ 
+ 	//performing background subtraction 
+	pMOG2Shadow->operator()(frameToResizeShadow , fgmaskShadow, .01);
+
+	//performing sWND
+	displayFrame("fgmaskShadow" , fgmaskShadow);
+	Mat fgmaskShadowSWND = slidingWindowNeighborDetector(fgmaskShadow, fgmaskShadow.rows/10, fgmaskShadow.cols/20);
+	displayFrame("fgmaskShadowSWND", fgmaskShadowSWND); 
+
+	fgmaskShadowSWND = slidingWindowNeighborDetector(fgmaskShadowSWND, fgmaskShadowSWND.rows/20, fgmaskShadowSWND.cols/40);
+	displayFrame("fgmaskShadowSWND2", fgmaskShadowSWND);
+
+	//performing canny
+	Mat fgMaskShadowSWNDCanny = cannyContourDetector(fgmaskShadowSWND);
+	displayFrame("fgMaskShadowSWNDCanny2", fgMaskShadowSWNDCanny);
+
+	//returning processed frame
+	return fgMaskShadowSWNDCanny;
+}
+
+
+//method to do background subtraction with MOG 1
+Mat bgMog(bool buffer)
+{
+
+	//instantiating Mat objects
+	Mat fgmask;
+	Mat bck;
+	Mat fgMaskSWNDCanny;
+
+	//performing background subtraction
+    bckSubMOG.operator()(globalFrames.at(i), fgmask, .01); //1.0 / 200);
+	
+	if(!buffer)
+	{ 
+		displayFrame("MOG Fg MAsk", fgmask);
+ 		displayFrame("RCFrame", globalFrames[i]);
+
+ 		//performing sWND
+		Mat fgmaskSWND = slidingWindowNeighborDetector(fgmask, fgmask.rows/10, fgmask.cols/20);
+		displayFrame("fgmaskSWND", fgmaskSWND);
+ 
+		fgmaskSWND = slidingWindowNeighborDetector(fgmaskSWND, fgmaskSWND.rows/20, fgmaskSWND.cols/40);
+		displayFrame("fgmaskSWNDSWND2", fgmaskSWND);
+
+		fgmaskSWND = slidingWindowNeighborDetector(fgmaskSWND, fgmaskSWND.rows/30, fgmaskSWND.cols/60);
+		displayFrame("fgmaskSWNDSWND3", fgmaskSWND);
+
+		//performing canny
+		fgMaskSWNDCanny = cannyContourDetector(fgmaskSWND);
+		displayFrame("fgMaskSWNDCanny2", fgMaskSWNDCanny);
+	}
+
+	//return canny
+	return fgMaskSWNDCanny;
+}
+
+//method to perform vibe background subtraction
+Mat vibeBackgroundSubtraction(bool buffer)
+{
+	//instantiating Mat frame object
+	Mat sWNDVibeCanny;
+
+	//if done buffering
+	if(i == bufferMemory)
+	{
+		//instantiating Mat frame object
+		Mat resizedFrame;
+		
+		//saving current frame
+		globalFrames[i].copyTo(resizedFrame);
+ 
+ 		//initializing model
+ 		bgfg.init_model(resizedFrame);
+
+ 		//return tmp frame
+		return resizedFrame;
+	}
+
+	else
+	{
+
+		//instantiating Mat frame object
+		Mat resizedFrame;
+
+		//saving current frame
+		globalFrames[i].copyTo(resizedFrame); 
+
+		//processing model
+		vibeBckFrame = *bgfg.fg(resizedFrame);
+
+		displayFrame("vibeBckFrame", vibeBckFrame); 
+
+		//performing sWND
+		Mat sWNDVibe = slidingWindowNeighborDetector(vibeBckFrame, vibeBckFrame.rows/10, vibeBckFrame.cols/20);
+		displayFrame("sWNDVibe1", sWNDVibe); 
+
+		//performing sWND
+		sWNDVibe = slidingWindowNeighborDetector(vibeBckFrame, vibeBckFrame.rows/20, vibeBckFrame.cols/40);
+		displayFrame("sWNDVibe2", sWNDVibe); 
+
+		//performing canny
+		Mat sWNDVibeCanny = cannyContourDetector(sWNDVibe);
+		displayFrame("sWNDVibeCannycanny2", sWNDVibeCanny);
+	}
+
+	//returning processed frame
+	return sWNDVibeCanny;
+}
 
 vector <KeyPoint> kMeansKeypoints(vector <KeyPoint> keypoints, int iterations)
 {
