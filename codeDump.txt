@@ -1,4 +1,7 @@
 
+	cout << "X ANOMALY " << ((double) xMovement) / ((double) xLearnedMovement) << endl;
+	cout << "Y ANOMALY " << ((double) yMovement) / ((double) yLearnedMovement) << endl;
+	
 //method to do background subtraction with MOG2 
 Mat bgMog2(bool buffer)
 {

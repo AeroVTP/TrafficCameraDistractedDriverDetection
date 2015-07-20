@@ -116,10 +116,16 @@ Mat backgroundFrameColorMedian;
 //Mat to hold temp GMM models
 Mat gmmFrameRaw, binaryGMMFrame, gmmTempSegmentFrame;
 
+Mat finalTrackingFrame;
+
 //Mat for optical flow
 Mat flow;
 Mat cflow;
 Mat optFlow;
+
+vector <vector <Point> > carCoordinates;
+
+vector <vector <Point> >  vectorOfDetectedCars;
 
 bool objectOFAFirstTime = true;
 
@@ -138,6 +144,14 @@ bool debug = false;
 //controls if median is used
 bool useMedians = true;
 
+double xAverageMovement = 0;
+double xAverageCounter = 0;
+double xLearnedMovement = 0;
+
+double yAverageMovement = 0;
+double yAverageCounter = 0;
+double yLearnedMovement = 0;
+
 //setting constant filename to read form
 //const char* filename = "assets/testRecordingSystemTCD3TCheck.mp4";
 //const char* filename = "assets/ElginHighWayTCheck.mp4";
@@ -150,10 +164,12 @@ bool useMedians = true;
 //const char* filename = "assets/genericHighWayYoutubeStockFootage720OrangeHDCom.mp4";
 //const char* filename = "assets/xmlTrainingVideoSet2.mp4";
 //const char* filename = "assets/videoAndrewGithub.mp4";
-const char* filename = "assets/froggerHighwayTCheck.mp4";
+//const char* filename = "assets/froggerHighwayTCheck.mp4";
 //const char* filename = "assets/OrangeHDStockFootageHighway72010FPSTCheck.mp4";
 //const char* filename = "assets/trafficStockCountryRoad16Seconds30FPSTCheck.mp4";
 //const char* filename = "assets/cityCarsTraffic3LanesStreetRoadJunctionPond5TCheck15FPSTCheck.mp4";
+//const char* filename = "assets/froggerHighwayDrunk.mp4";
+const char* filename = "assets/froggerHighwayDrunkShort.mp4";
 
 //defining format of data sent to threads 
 struct thread_data{
@@ -172,6 +188,11 @@ void displayFrame(string filename, Mat matToDisplay)
 	//if in debug mode and Mat is not empty
 	if(debug && matToDisplay.size[0] != 0)
 	{imshow(filename, matToDisplay);}
+
+	else if(matToDisplay.size[0] == 0)
+	{
+		cout << filename << " is empty, cannot be displayed." << endl;
+	}
 }
 
 //method to display frame overriding debug
@@ -180,6 +201,10 @@ void displayFrame(string filename, Mat matToDisplay, bool override)
 	//if override and Mat is not emptys
 	if(override && matToDisplay.size[0] != 0 && filename != "Welcome"){ imshow(filename, matToDisplay);}
 	else if(override && matToDisplay.size[0] != 0){namedWindow(filename); imshow(filename, matToDisplay);}
+	else if(matToDisplay.size[0] == 0)
+	{
+		cout << filename << " is empty, cannot be displayed." << endl;
+	}
 }
 
 //method to draw optical flow, only should be called during demos
@@ -680,8 +705,7 @@ void welcome()
 {
 	if(i < bufferMemory * 2)
 	{
-		cout << to_string(i) << endl;
-		Mat img = imread("assets/TCD3.png");
+ 		Mat img = imread("assets/TCD3.png");
 		putText(img, "Initializing; V. Prasad 2015 All Rights Reserved"
 			, cvPoint(30,30),CV_FONT_HERSHEY_SIMPLEX, .75, cvScalar(255,255,0), 1, CV_AA, false);
 
@@ -856,6 +880,8 @@ void *calcMedianImage(void *threadarg)
 
 	}
 
+  	backgroundFrameMedian.copyTo(finalTrackingFrame);
+
 	//signal thread completion
     medianImageCompletion = 1;
 }
@@ -950,7 +976,7 @@ Mat imageSubtraction()
 void grayScaleFrameMedian()
 {
 	if(debug)
-		cout << "Entered gray sale median" << endl;
+		cout << "Entered gray scale median" << endl;
 
 	//instantiating multithread object
 	pthread_t medianImageThread;
@@ -1007,9 +1033,14 @@ void *calcGaussianMixtureModel(void *threadarg)
 		gmmFrame = slidingWindowNeighborDetector(gmmFrame, gmmFrame.rows / 20, gmmFrame.cols / 40);
 		displayFrame("sWDNs GMM Frame 3", gmmFrame);
 
-		//perform Canny
-		Mat gmmFrameSWNDCanny = cannyContourDetector(gmmFrame);
-		displayFrame("CannyGMM", gmmFrameSWNDCanny);
+		Mat gmmFrameSWNDCanny = gmmFrame;
+
+		if(i > bufferMemory * 3 -1)
+		{
+			//perform Canny
+			gmmFrameSWNDCanny = cannyContourDetector(gmmFrame);
+			displayFrame("CannyGMM", gmmFrameSWNDCanny);
+		}
 
 		//save into canny
 		cannyGMM = gmmFrameSWNDCanny;
@@ -1048,14 +1079,18 @@ Mat gaussianMixtureModel()
 void generateBackgroundImage(int FRAME_RATE)
 {
 	//if post-processing
-	if(readMedianImg && useMedians)
+	if(readMedianImg && useMedians && i < bufferMemory + 5)
 	{
 		//read median image
-		backgroundFrameMedian = imread("medianIMG.jpg");
+		backgroundFrameMedian = imread("assets/froggerHighwayDrunkMedian.jpg");
 
 		//convert to grayscale
-		cvtColor( backgroundFrameMedian, backgroundFrameMedian, CV_BGR2GRAY );
- 	}
+		cvtColor(backgroundFrameMedian, backgroundFrameMedian, CV_BGR2GRAY);
+
+		displayFrame("backgroundFrameMedian", backgroundFrameMedian);
+
+	 	backgroundFrameMedian.copyTo(finalTrackingFrame);
+	}
 
 	//if real-time calculation
 	else
@@ -1128,6 +1163,123 @@ Mat cannyContourDetector(Mat srcFrame)
 
  	//return image with contours
 	return drawing;
+}
+
+Mat slidingWindowNeighborPointDetector (Mat sourceFrame, int numRowSections, int numColumnSections, vector <Point> coordinates)
+{
+	//if using default num rows
+		if(numRowSections == -1 || numColumnSections == -1)
+		{
+			//split into standard size
+			numRowSections = sourceFrame.rows / 10;
+			numColumnSections = sourceFrame.cols / 20;
+		}
+
+		/*
+
+		double numRowSectionsDouble = numRowSections;
+		double numColumnSectionsDouble = numColumnSections;
+
+		while(sourceFrame.rows % numRowSections != 0)
+		{
+			numRowSections++;
+			numRowSectionsDouble = numRowSections;
+		}
+
+		while(sourceFrame.cols % numColumnSections != 0)
+		{
+			numColumnSections++;
+			numColumnSectionsDouble = numColumnSections;
+		}
+
+		*/
+
+		//declaring percentage to calculate density
+		double percentage = 0;
+
+		//setting size of search area
+		int windowWidth = sourceFrame.rows / numRowSections;
+		int windowHeight = sourceFrame.cols / numColumnSections;
+
+		//creating destination frame of correct size
+		Mat destinationFrame = Mat(sourceFrame.rows, sourceFrame.cols, CV_8UC1);
+
+		//cycling through pieces
+		for(int v = windowWidth/2; v <= sourceFrame.rows - windowWidth/2; v++)
+		{
+			for(int j = windowHeight/2; j <= sourceFrame.cols - windowHeight/2; j++)
+			{
+				/*
+				//variables to calculate density
+				double totalCounter = 0;
+				double detectCounter = 0;
+				*/
+
+				int pointsCounter = 0;
+
+				//cycling through neighbors
+				for(int x =  v - windowWidth/2; x < v + windowWidth/2; x++)
+				{
+					for(int k = j - windowHeight/2; k < j + windowHeight/2; k++)
+					{
+						/*
+						int z = 0;
+						int pointsCounter = 0;
+						while(pointsCounter <= 1 && z < coordinates.size())
+						{
+							for(int b = 0; b < coordinates.size())
+						}
+						*/
+
+						Point currentPoint(x,k);
+
+						for(int z = 0; z< coordinates.size(); z++)
+						{
+							if(coordinates[z] == currentPoint)
+							{
+								pointsCounter++;
+							}
+						}
+
+						/*
+						//if object exists
+						if(sourceFrame.at<uchar>(x,k) > 127)
+						{
+							//add to detect counter
+							detectCounter++;
+						}
+
+						//count pixels searched
+						totalCounter++;
+						*/
+					}
+				}
+
+				/*
+				//prevent divide by 0 if glitch and calculate percentage
+				if(totalCounter != 0)
+					percentage = detectCounter / totalCounter;
+				else
+					cout << "Ted Cruz" << endl;
+				*/
+
+				//if object exists flag it
+				if(pointsCounter >  1)
+				{
+	 				destinationFrame.at<uchar>(v,j) = 255;
+				}
+
+				//else set it to 0
+				else
+				{
+					//sourceFrame.at<uchar>(v,j) = 0;
+					destinationFrame.at<uchar>(v,j) = 0;
+				}
+			}
+		}
+
+		//return processed frame
+	 	return destinationFrame;
 }
 
 //method to perform proximity density search to remove noise and identify noise
@@ -1270,20 +1422,24 @@ void *computeVibeBackgroundThread(void *threadarg)
 		//processing model
 		vibeBckFrame = *bgfg.fg(resizedFrame);
 
-		displayFrame("vibeBckFrame", vibeBckFrame); 
+		displayFrame("vibeBckFrame", vibeBckFrame);
 
 		//performing sWND
 		Mat sWNDVibe = slidingWindowNeighborDetector(vibeBckFrame, vibeBckFrame.rows/10, vibeBckFrame.cols/20);
-		displayFrame("sWNDVibe1", sWNDVibe); 
+		displayFrame("sWNDVibe1", sWNDVibe);
 
 		//performing sWND
 		sWNDVibe = slidingWindowNeighborDetector(vibeBckFrame, vibeBckFrame.rows/20, vibeBckFrame.cols/40);
-		displayFrame("sWNDVibe2", sWNDVibe); 
+		displayFrame("sWNDVibe2", sWNDVibe);
 
-		//performing canny
-		Mat sWNDVibeCanny = cannyContourDetector(sWNDVibe);
-		displayFrame("sWNDVibeCannycanny2", sWNDVibeCanny);
+		Mat sWNDVibeCanny = sWNDVibe;
 
+		if(i > bufferMemory * 3 -1)
+		{
+			//performing canny
+			Mat sWNDVibeCanny = cannyContourDetector(sWNDVibe);
+			displayFrame("sWNDVibeCannycanny2", sWNDVibeCanny);
+		}
 
 	//saving processed frame
 	vibeDetectionGlobalFrame = sWNDVibeCanny;
@@ -1507,28 +1663,28 @@ void objectDetection(int FRAME_RATE)
 		if(firstTimeMedianImage && medianDetectionGlobalFrameCompletion == 1 )
 		{
 			tmpMedian = medianDetectionGlobalFrame;
-			displayFrame("medianDetection", tmpMedian, true);
+			displayFrame("medianDetection", tmpMedian);
 			firstTimeMedianImage = false;
 			finishedMedian = true;
 		}
 		if(firstTimeVibe && vibeDetectionGlobalFrameCompletion == 1 )
 		{
 			tmpVibe = vibeDetectionGlobalFrame;
-			displayFrame("vibeDetection", tmpVibe, true);
+			displayFrame("vibeDetection", tmpVibe);
 			firstTimeVibe = false;
 			finishedVibe = true;
 		}
 		if(firstTimeMOG1 && mogDetection1GlobalFrameCompletion == 1 )
 		{
 			tmpMOG1= mogDetection1GlobalFrame;
-			displayFrame("mogDetection1", tmpMOG1, true);
+			displayFrame("mogDetection1", tmpMOG1);
 			firstTimeMOG1 = false;
 			finishedMOG1 = true;
 		}
 		if(firstTimeMOG2 && mogDetection2GlobalFrameCompletion == 1)
 		{
 			tmpMOG2 = mogDetection2GlobalFrame;
-			displayFrame("mogDetection2", tmpMOG2, true);
+			displayFrame("mogDetection2", tmpMOG2);
 			firstTimeMOG2 = false;
 			finishedMOG2 = true;
 		}
@@ -1539,25 +1695,24 @@ void objectDetection(int FRAME_RATE)
 	mogDetection2GlobalFrameCompletion = 0;
  	medianDetectionGlobalFrameCompletion = 0;
 
- 	/*
+
 	displayFrame("vibeDetection", tmpVibe, true);
 	displayFrame("mogDetection1", tmpMOG1, true);
 	displayFrame("mogDetection2", tmpMOG2, true);
 	displayFrame("medianDetection", tmpMedian, true);
-	*/
-
-	displayFrame("gmmDetection", gmmDetection, true);
+	displayFrame("gmmDetection", gmmDetection);
 	displayFrame("ofaDetection", ofaDetection, true);
-	displayFrame("Raw Frame", globalFrames[i], true);
+	displayFrame("Raw Frame", globalFrames[i]);
 
  	waitKey(30);
 
   	if(i > bufferMemory + 5 && tmpMOG1.channels() == 3 && tmpMOG2.channels() == 3 && ofaDetection.channels() == 3 && tmpMedian.channels() == 3)
  	{
-  		if(i > bufferMemory * 2)
+   		if(i > bufferMemory * 3 + 2 && tmpMOG1.channels() == 3 && tmpMOG2.channels() == 3 && ofaDetection.channels() == 3 && tmpMedian.channels() == 3
+  				&& tmpVibe.channels() == 3 && gmmDetection.channels() == 3 && 1 == 2)
   		{
   			Mat combined = tmpMOG1 +  tmpMOG2 + ofaDetection + tmpMedian + tmpVibe + gmmDetection;
-			displayFrame("Combined Contours", combined, true);
+			displayFrame("Combined Contours", combined);
 
 			double beta = ( 1.0 - .5 );
 			addWeighted( combined, .5, globalFrames[i], beta, 0.0, combined);
@@ -1566,7 +1721,7 @@ void objectDetection(int FRAME_RATE)
   		else
   		{
 			Mat combined = tmpMOG1 +  tmpMOG2 + ofaDetection + tmpMedian;
-			displayFrame("Combined Contours", combined, true);
+			displayFrame("Combined Contours", combined);
 
 			double beta = ( 1.0 - .5 );
 			addWeighted( combined, .5, globalFrames[i], beta, 0.0, combined);
@@ -1587,29 +1742,39 @@ void fillCoordinates(vector <Point2f> detectedCoordinatesMoments)
 	{
 		Point tmpPoint ((int) detectedCoordinatesMoments[v].x,  (int) detectedCoordinatesMoments[v].y);
 
-		if((tmpPoint.x > 10 && tmpPoint.x < globalGrayFrames[i].cols - 10) &&
-				(tmpPoint.y > 10 && tmpPoint.y < globalGrayFrames[i].rows - 10))
+		if((tmpPoint.x > 30 && tmpPoint.x < globalGrayFrames[i].cols - 60) &&
+				(tmpPoint.y > 30 && tmpPoint.y < globalGrayFrames[i].rows - 30))
  		{
 			detectedCoordinates.push_back(tmpPoint);
  		}
  	}
 }
 
+bool point_comparator(const cv::Point2f &a, const cv::Point2f &b) {
+    return a.x*a.x + a.y*a.y < b.x*b.x + b.y*b.y; // (/* Your expression */);
+}
+
 void displayCoordinates(vector <Point> coordinatesToDisplay)
 {
  	for(int v = 0; v < coordinatesToDisplay.size(); v++)
 	{
-		//cout << "(" << coordinatesToDisplay[v].x << "," << coordinatesToDisplay[v].y << ")" << endl;
+		cout << "(" << coordinatesToDisplay[v].x << "," << coordinatesToDisplay[v].y << ")" << endl;
 	}
+
 }
 
-void drawCoordinates(vector <Point> coordinatesToDisplay)
+Mat checkBlobVotes(Mat srcFrame, vector <Point> coordinates)
+{
+	return srcFrame;
+}
+
+void drawCoordinates(vector <Point> coordinatesToDisplay, String initialName)
 {
 	//Mat tmpToDraw;
 
 	//globalFrames[i].copyTo(tmpToDraw);
 
-	Mat tmpToDraw = Mat::zeros( globalFrames[i].size(), CV_8UC1);
+	Mat tmpToDraw = Mat::zeros(globalFrames[i].size(), CV_16UC3);
 
 	/*
 	for(int v = 0; v < tmpToDraw.rows * 1; v++)
@@ -1621,19 +1786,339 @@ void drawCoordinates(vector <Point> coordinatesToDisplay)
 	}
 	*/
 
+	cout << " SIZE OF COORDINATES TO DISPLAY " << coordinatesToDisplay.size() << endl;
+
 	for(int v = 0; v < coordinatesToDisplay.size(); v++)
 	{
 		circle( tmpToDraw, coordinatesToDisplay[v], 4, Scalar(254, 254, 0), -1, 8, 0 );
 	}
 
-	displayFrame("Coordinates to Display", tmpToDraw, true);
+	//destroyWindow("Coordinates to Display");
+	displayFrame(initialName ,tmpToDraw, true);
+	//imwrite("trackingFrame" + initialName + ".TIFF", trackingFrame);
+
+	//tmpToDraw = slidingWindowNeighborPointDetector(tmpToDraw, tmpToDraw.rows / 5, tmpToDraw.cols / 10 , coordinatesToDisplay);
+	//**tmpToDraw = slidingWindowNeighborPointDetector(tmpToDraw, tmpToDraw.rows / 10, tmpToDraw.cols / 20 , coordinatesToDisplay);
+	//tmpToDraw = slidingWindowNeighborPointDetector(tmpToDraw, tmpToDraw.rows / 20, tmpToDraw.cols / 40 , coordinatesToDisplay);
+	//tmpToDraw = slidingWindowNeighborPointDetector(tmpToDraw, tmpToDraw.rows / 30, tmpToDraw.cols / 60 , coordinatesToDisplay);
+	//tmpToDraw = slidingWindowNeighborPointDetector(tmpToDraw, tmpToDraw.rows / 40, tmpToDraw.cols / 80 , coordinatesToDisplay);
+
+	//tmpToDraw = checkBlobVotes(tmpToDraw, coordinatesToDisplay);
+
+	//displayFrame("sWNPD Frame", tmpToDraw, true);
+
+}
+
+vector <Point> sortCoordinates(vector <Point> coordinates)
+{
+	sort(coordinates.begin(), coordinates.end(), point_comparator);
+	return coordinates;
+}
+
+Point averagePoints(vector <Point> coordinates)
+{
+	if(coordinates.size() == 0)
+	{
+		double xCoordinate = 0;
+		double yCoordinate = 0;
+
+		for(int v = 0; v < coordinates.size(); v++)
+		{
+			xCoordinate += coordinates[v].x;
+			yCoordinate += coordinates[v].y;
+		}
+
+		Point tmpPoint(xCoordinate/coordinates.size(), yCoordinate/coordinates.size());
+
+		return tmpPoint;
+	}
+
+	else
+	{
+		return coordinates[0];
+	}
+}
+
+vector <Point> averageCoordinates(vector <Point> coordinates, int distanceThreshold)
+{
+	if(coordinates.size() > 1)
+	{
+		vector <Point> destinationCoordinates;
+		vector <Point> pointsToAverage;
+		coordinates = sortCoordinates(coordinates);
+		Point tmpPoint = coordinates[0];
+
+		bool enteredOnce = false;
+
+		for(int v = 0; v < coordinates.size(); v++)
+		{
+			double tmp1 = abs( tmpPoint.y - coordinates[v].y);
+			double tmp2 =  abs(tmpPoint.x - coordinates[v].x);
+			double tmp = sqrt(tmp1 * tmp2);
+			/*
+			cout << tmp1 << " tmp1 " << endl;
+			cout << tmp2 << " tmp2 " << endl;
+			cout << tmp << " tmp " << endl;
+			*/
+			if(sqrt((abs(tmpPoint.y - coordinates[v].y) * (abs(tmpPoint.x - coordinates[v].x)))) > distanceThreshold)
+			{
+				//cout << "Entered Refresh " << v << endl;
+				destinationCoordinates.push_back(averagePoints(pointsToAverage));
+				tmpPoint = coordinates[v];
+				pointsToAverage.erase(pointsToAverage.begin(), pointsToAverage.end());
+				bool enteredOnce =  true;
+			}
+			else
+			{
+				//cout << "Entered Old " << v << endl;
+				pointsToAverage.push_back(coordinates[v]);
+			}
+		}
+
+		if(!enteredOnce)
+		{
+			destinationCoordinates.push_back(averagePoints(pointsToAverage));
+		}
+
+		else if(pointsToAverage.size() > 0)
+		{
+			destinationCoordinates.push_back(averagePoints(pointsToAverage));
+		}
+
+		return destinationCoordinates;
+	}
+
+	else
+	{
+ 		return coordinates;
+	}
+}
+
+void drawAllTracking()
+{
+ 	for(int v = 0; v < detectedCoordinates.size(); v++)
+	{
+ 		circle(	finalTrackingFrame, detectedCoordinates[v], 4, Scalar(254, 254, 0), -1, 8, 0 );
+ 	}
+ 	displayFrame("All Tracking Frame", finalTrackingFrame, true);
+ }
+
+void registerFirstCar()
+{
+	vectorOfDetectedCars.push_back(detectedCoordinates);
+
+	for(int v= 0 ; v< detectedCoordinates.size(); v++)
+	{
+		if(detectedCoordinates[v].x < 75)
+		{
+ 			vector <Point> carCoordinate;
+			carCoordinate.push_back(detectedCoordinates[v]);
+			carCoordinates.push_back(carCoordinate);
+		}
+ 	}
+}
+
+bool checkBasicXYAnomaly(int xMovement, int yMovement, Point carPoint)
+{
+	const double maxThreshold = 10;
+	const double minThreshold = -10;
+
+	cout << "X MOVEMENT " << (double) xMovement << endl;
+	cout << "Y MOVEMENT " << (double) yMovement << endl;
+
+	cout << "X LEARNED " << (double) xLearnedMovement << endl;
+	cout << "Y LEARNED " << (double) yLearnedMovement << endl;
+
+  	Mat drawAnomalyCar = Mat::zeros( globalFrames[i].size(), CV_16UC3 );
+
+	if(((xMovement > xLearnedMovement + maxThreshold || xMovement < xLearnedMovement + minThreshold))
+			|| ((yMovement > yLearnedMovement + maxThreshold) || (yMovement < yLearnedMovement + minThreshold)))
+	{
+		circle(drawAnomalyCar, carPoint, 5, Scalar(0, 0, 255), -1);
+		cout << " !!!!!!!!!!!ANOMALY DETECTED!!!!!!!!!!!" << endl;
+	}
+	displayFrame("drawAnomalyCar", drawAnomalyCar, true);
+}
+
+int findMin(int num1, int num2)
+{
+	if(num1 < num2)
+	{
+		return num1;
+	}
+	else if(num2 < num1)
+	{
+		return num2;
+	}
+	else
+	{
+		return num1;
+	}
+}
+
+void analyzeMovement()
+{
+	vector <Point> currentDetects =  vectorOfDetectedCars[vectorOfDetectedCars.size() - 1];
+	vector <Point> prevDetects =  vectorOfDetectedCars[vectorOfDetectedCars.size() - 2];
+
+	const int distanceThreshold = 15;
+
+	int least = findMin(currentDetects.size(), prevDetects.size());
+
+	for(int v = 0; v < least; v++)
+	{
+		currentDetects = sortCoordinates(currentDetects);
+		prevDetects = sortCoordinates(prevDetects);
+
+		double lowestDistance = INT_MAX;
+		double distance;
+
+		Point tmpPoint;
+		Point tmpDetectPoint;
+		Point bestPoint;
+
+		for(int j = 0; j < prevDetects.size(); j++ )
+		{
+			tmpDetectPoint = prevDetects[j];
+			tmpPoint = currentDetects[v];
+
+			distance = sqrt(abs(tmpDetectPoint.x - tmpPoint.x) * (abs(tmpDetectPoint.y - tmpPoint.y)));
+
+			if(distance < lowestDistance)
+			{
+				lowestDistance = distance;
+				bestPoint  = tmpDetectPoint;
+ 			}
+			//carCoordinates.push_back();
+		}
+
+		int xDisplacement = abs(bestPoint.x - tmpPoint.x);
+		int yDisplacement = abs(bestPoint.y - tmpPoint.y);
+
+		if(lowestDistance < distanceThreshold)
+		{
+			xAverageMovement += xDisplacement;
+			yAverageMovement += yDisplacement;
+			xAverageCounter++;
+			yAverageCounter++;
+			xLearnedMovement = (xAverageMovement / xAverageCounter);
+			yLearnedMovement = (yAverageMovement / yAverageCounter);
+
+			if(i > bufferMemory + 15)
+				checkBasicXYAnomaly(xDisplacement, yDisplacement, tmpDetectPoint);
+		}
+	}
+}
+
+
+void individualTracking()
+{
+	const double distanceThreshold = 25;
+
+	if(i == bufferMemory + 11 || ((carCoordinates.size() == 0) && i > bufferMemory + 10))
+	{
+ 		registerFirstCar();
+	}
+
+	else if(detectedCoordinates.size() > 0)
+	{
+
+		vectorOfDetectedCars.push_back(detectedCoordinates);
+
+		analyzeMovement();
+
+		/*
+		cout << "SECOND" << endl;
+
+		for(int v = 0; v < carCoordinates.size(); v++)
+		{
+			cout << " DETECTED " << detectedCoordinates.size() << endl;
+			cout << " CAR COORDINATES 2 " << carCoordinates.size() << endl;
+			carCoordinates[v] = sortCoordinates(carCoordinates[v]);
+
+			detectedCoordinates = sortCoordinates(detectedCoordinates);
+
+			double lowestDistance = INT_MAX;
+			double distance;
+
+			Point tmpPoint;
+			Point tmpDetectPoint;
+			Point bestPoint;
+
+			for(int j = 0; j < detectedCoordinates.size(); j++ )
+			{
+				tmpDetectPoint = detectedCoordinates[j];
+				tmpPoint = carCoordinates[v][carCoordinates[v].size()-1];
+
+				distance = sqrt(abs(tmpDetectPoint.x - tmpPoint.x) * (abs(tmpDetectPoint.y - tmpPoint.y)));
+
+				cout << " ALL DISTANCES " << distance << endl;
+
+				if(distance < lowestDistance)
+				{
+					lowestDistance = distance;
+					bestPoint  = tmpDetectPoint;
+					cout << " CAR DISTANCE IS " << distance << endl;
+				}
+				//carCoordinates.push_back();
+			}
+
+			int xDisplacement = abs(bestPoint.x - tmpPoint.x);
+			int yDisplacement = abs(bestPoint.y - tmpPoint.y);
+
+			cout << " LOWEST CAR DISTANCE IS " << lowestDistance << endl;
+			cout << " X DISPLACEMENT is " <<xDisplacement<< endl;
+
+			if(lowestDistance < distanceThreshold)
+			{
+				xAverageMovement += xDisplacement;
+				yAverageMovement += yDisplacement;
+				xAverageCounter++;
+				yAverageCounter++;
+				xLearnedMovement = (xAverageMovement / xAverageCounter);
+				yLearnedMovement = (yAverageMovement / yAverageCounter);
+
+				cout << " Y DISPLACEMENT is " <<yDisplacement << endl;
+
+				cout << " AVERAGE X DISPLACEMENT IS " << xLearnedMovement << endl;
+				cout << " AVERAGE Y DISPLACEMENT IS " << yLearnedMovement << endl;
+
+				if(i > bufferMemory + 15)
+					checkBasicXYAnomaly(xDisplacement, yDisplacement, tmpDetectPoint);
+			}
+		}
+		*/
+	}
 }
 
 void trackingML()
 {
- 	displayCoordinates(detectedCoordinates);
-	drawCoordinates(detectedCoordinates);
- }
+	if(i > bufferMemory + 10)
+	{
+		cout << " Entered ML" << endl;
+
+		//displayCoordinates(detectedCoordinates);
+
+		drawCoordinates(detectedCoordinates, "1st Pass");
+
+ 		//displayCoordinates(detectedCoordinates);
+
+		//imwrite("trackingFrame.TIFF", trackingFrame);
+ 		detectedCoordinates = averageCoordinates(detectedCoordinates, 50);
+
+ 		displayCoordinates(detectedCoordinates);
+
+		drawCoordinates(detectedCoordinates, "2nd");
+
+  		individualTracking();
+
+		drawAllTracking();
+
+		cout << " Exited ML" << endl;
+	}
+
+	detectedCoordinates.erase(detectedCoordinates.begin(), detectedCoordinates.end());
+}
 
 //method to initalize Mats on startup
 void initilizeMat()
@@ -1646,7 +2131,15 @@ void initilizeMat()
 		backgroundSubtractorGMM->set("decisionThreshold", 0.85);
 
 		//save gray value to set Mat parameters
-		backgroundFrameMedian = globalGrayFrames[i];
+		globalGrayFrames[i].copyTo(backgroundFrameMedian);
+
+		/*
+		globalFrames[i].copyTo(trackingFrame);
+
+		for(int v = 0; v < trackingFrame.rows; v++)
+			for(int j = 0; j < trackingFrame.cols; j++)
+				trackingFrame.at<uchar>(v,j) = 0;
+		*/
 	}
 }
 
@@ -1805,7 +2298,7 @@ int main() {
 		strActiveTimeDifference = (to_string(calculateFPS(tStart, tFinal))).substr(0, 4);
 
 		//display performance
-		if(!debug)
+		if(debug)
 			cout << "FPS is " << (to_string(1/(calculateFPS(tStart, tFinal)))).substr(0, 4) << endl;
 
 		//saving FPS values
@@ -1822,8 +2315,6 @@ int main() {
 		//method to process exit
 		//if(processExit(capture,  t1, keyboardClick))
 			//return 0;
-
-		detectedCoordinates.erase(detectedCoordinates.begin(), detectedCoordinates.end());
 
 		//deleting current frame from RAM
    		delete frameToBeDisplayed;
