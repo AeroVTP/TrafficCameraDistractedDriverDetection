@@ -1,7 +1,7 @@
 //======================================================================================================
 // Name        : TrafficCameraDistractedDriverDetection.cpp
 // Author      : Vidur Prasad
-// Version     : 0.6.0
+// Version     : 0.6.2
 // Copyright   : Institute for the Development and Commercialization of Advanced Sensor Technology Inc.
 // Description : Detect Drunk, Distracted, and Anomalous Driving Using Traffic Cameras
 //======================================================================================================
@@ -235,10 +235,15 @@ vector<Point> distanceFromNormalPoints;
 //const char* filename = "assets/trafficStockCountryRoad16Seconds30FPSTCheck.mp4";
 //const char* filename = "assets/cityCarsTraffic3LanesStreetRoadJunctionPond5TCheck15FPSTCheck.mp4";
 //const char* filename = "assets/froggerHighwayDrunk.mp4";
-const char* filename = "assets/froggerHighwayDrunkShort.mp4";
+//const char* filename = "assets/froggerHighwayDrunkShort.mp4";
 //const char* filename = "assets/froggerHighwayDrunkV2.mp4";
 //const char* filename = "assets/froggerHighwayDrunkV4TCheck.mp4";
 //const char* filename = "assets/froggerHighwayLaneChangeV4.mp4";
+//const char* filename = "assets/froggerHighwayTCheckV5.mp4";
+const char* filename = "assets/froggerHighwayLaneChangeV6.mp4";
+
+//String medianImageFilename = "smallFroggerMedian.jpg";
+String medianImageFilename = "froggerHighwayDrunkMedian.jpg";
 
 //defining format of data sent to threads 
 struct thread_data {
@@ -373,16 +378,17 @@ int main() {
 		//saving FPS values
 		FPS.push_back(strActiveTimeDifference);
 
-		if (i > bufferMemory + mlBuffer + 1) {
-			String tmpToDisplay = "Running Image Analysis -> Frame Number: "
-					+ to_string(i);
-			welcome(tmpToDisplay);
-		}
+		welcome("Running Computer Vision -> " + to_string(i));
 
-		//running computer vision
+		//running Computer Vision
 		objectDetection(FRAME_RATE);
 
+		welcome("Starting Tracking ML -> " + to_string(i));
+
+		//running Tracking ML
 		trackingML();
+
+		welcome("Finished Tracking ML -> " + to_string(i));
 
 		//display frame number
 		cout << "Currently processing frame number " << i << "." << endl;
@@ -396,8 +402,6 @@ int main() {
 
 		//incrementing global counter
 		i++;
-
-		waitKey(30);
 	}
 
 	//delete entire vector

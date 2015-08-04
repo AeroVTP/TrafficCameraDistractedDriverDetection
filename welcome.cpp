@@ -53,7 +53,7 @@ void welcome() {
 
 		//displaying text
 		putText(img, "Initializing; V. Prasad 2015 All Rights Reserved",
-				cvPoint(0, 30), CV_FONT_HERSHEY_SIMPLEX, 1,
+				cvPoint(15, 30), CV_FONT_HERSHEY_SIMPLEX, 1,
 				cvScalar(255, 255, 0), 1, CV_AA, false);
 
 		//display welcome images
@@ -73,7 +73,7 @@ void welcome(String text) {
 	Mat img = imread("assets/TCD3 Splash V2.png");
 
 	//writing text on images
-	putText(img, text, cvPoint(0, 30), CV_FONT_HERSHEY_SIMPLEX, .8,
+	putText(img, text, cvPoint(15, 30), CV_FONT_HERSHEY_SIMPLEX, .8,
 			cvScalar(255, 255, 0), 1, CV_AA, false);
 
 	//display welcome images

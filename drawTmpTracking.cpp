@@ -49,7 +49,7 @@ void drawTmpTracking() {
 	extern vector<vector<Point> > coordinateMemory;
 
 	//creating memory for tracking
-	const int thresholdPointMemory = 10 * numberOfCars;
+	const int thresholdPointMemory = 30 * numberOfCars;
 
 	//creating counter
 	int counter = coordinateMemory.size() - thresholdPointMemory;

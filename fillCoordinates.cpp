@@ -53,7 +53,7 @@ using namespace cv;
 using namespace std;
 
 //method to fill coordinates
-void fillCoordinates(vector<Point2f> detectedCoordinatesMoments) {
+void fillCoordinates(vector<Point2f> detectedCoordinatesMoments, int xLimiter, int yLimiter) {
 
 	extern vector<Mat> globalGrayFrames;
 	extern int i;
@@ -66,9 +66,9 @@ void fillCoordinates(vector<Point2f> detectedCoordinatesMoments) {
 				(int) detectedCoordinatesMoments[v].y);
 
 		//if not in border
-		if ((tmpPoint.x > 30 && tmpPoint.x < globalGrayFrames[i].cols - 60)
-				&& (tmpPoint.y > 30
-						&& tmpPoint.y < globalGrayFrames[i].rows - 30)) {
+		if ((tmpPoint.x > xLimiter && tmpPoint.x < globalGrayFrames[i].cols - xLimiter)
+				&& (tmpPoint.y > yLimiter
+						&& tmpPoint.y < globalGrayFrames[i].rows - yLimiter)) {
 			//saving into detected coordinates
 			detectedCoordinates.push_back(tmpPoint);
 		}

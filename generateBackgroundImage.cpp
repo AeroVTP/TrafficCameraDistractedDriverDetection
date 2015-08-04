@@ -76,8 +76,10 @@ void generateBackgroundImage(int FRAME_RATE) {
 
 	//if post-processing
 	if (readMedianImg && useMedians && i < bufferMemory + 5) {
+		extern string medianImageFilename;
+
 		//read median image
-		backgroundFrameMedian = imread("assets/froggerHighwayDrunkMedian.jpg");
+		backgroundFrameMedian = imread("assets/" + medianImageFilename);
 
 		//saving background to image
 		backgroundFrameMedian.copyTo(drawAnomalyCar);

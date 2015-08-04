@@ -1,3 +1,9 @@
+sqrt(
+					(abs(tmpPoint.y - coordinates[v].y)
+							* (abs(tmpPoint.x - coordinates[v].x))))
+					> distanceThreshold) {
+
+
 
 //method to calculate center point of contour
 vector<int> centerPoint(vector<Point> contours) {

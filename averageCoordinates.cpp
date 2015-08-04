@@ -68,7 +68,7 @@ Point averagePoints(vector<Point> coordinates) {
 
 	//if one point
 	else if (coordinates.size() == 1) {
-		cout << "ONLY  POINT " << coordinates.size() << endl;
+		//cout << "ONLY  POINT " << coordinates.size() << endl;
 
 		//return 1 point
 		return coordinates[0];
@@ -76,7 +76,7 @@ Point averagePoints(vector<Point> coordinates) {
 
 	//if no points
 	else {
-		cout << "ONLY POINT " << coordinates.size() << endl;
+		//cout << "ONLY POINT " << coordinates.size() << endl;
 
 		//create point
 		return Point(0, 0);
@@ -86,6 +86,10 @@ Point averagePoints(vector<Point> coordinates) {
 
 //average car points
 vector<Point> averageCoordinates(vector<Point> coordinates, int distanceThreshold) {
+
+
+	const int xDistanceThreshold = 400;
+	const int yDistanceThreshold = 60;
 
 	//if more than 1 point
 	if (coordinates.size() > 1)
@@ -107,11 +111,8 @@ vector<Point> averageCoordinates(vector<Point> coordinates, int distanceThreshol
 		for (int v = 0; v < coordinates.size(); v++) {
 
 			//if distance is above threshold
-			if (sqrt(
-					(abs(tmpPoint.y - coordinates[v].y)
-							* (abs(tmpPoint.x - coordinates[v].x))))
-					> distanceThreshold) {
-
+			if (( abs(tmpPoint.x - coordinates[v].x) > xDistanceThreshold) || ( abs(tmpPoint.y - coordinates[v].y) > yDistanceThreshold))
+			{
 				//save averaged cordinates
  				destinationCoordinates.push_back(averagePoints(pointsToAverage));
 

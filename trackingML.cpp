@@ -74,6 +74,7 @@ void trackingML()
 			welcome("Initialization Complete -> Starting ML");
 		}
 
+		/*
 		//begin processing frames
 		else if (i > bufferMemory + mlBuffer + 1) {
 			//display ready to run
@@ -83,6 +84,7 @@ void trackingML()
 			//display welcome image
 			welcome(tmpToDisplay);
 		}
+		*/
 
 		//process coordinates and average
 		processCoordinates();

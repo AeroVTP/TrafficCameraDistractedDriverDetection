@@ -75,6 +75,12 @@ void objectDetection(int FRAME_RATE) {
 	extern int bufferMemory;
 	extern int mlBuffer;
 
+	if (i > bufferMemory + 1) {
+				String tmpToDisplay = "Running Image Analysis -> Frame Number: "
+						+ to_string(i);
+				welcome(tmpToDisplay);
+	}
+
 	//saving processed frame
 	Mat gmmDetection = gaussianMixtureModel();
 	Mat ofaDetection = opticalFlowFarneback();
@@ -121,7 +127,7 @@ void objectDetection(int FRAME_RATE) {
 			finishedMedian = true;
 
 			//display welcome
- 			welcome("Median -> Set");
+ 			welcome("Median BckSub Set -> FN: " + to_string(i));
 		}
 
 		//controlling ViBe detector
@@ -135,8 +141,7 @@ void objectDetection(int FRAME_RATE) {
 			finishedVibe = true;
 
 			//display welcome
- 			welcome("ViBe -> Set");
-
+  			welcome("ViBe PDF Model Set -> FN: " + to_string(i));
 		}
 
 		//controlling MOG1 detector
@@ -150,7 +155,8 @@ void objectDetection(int FRAME_RATE) {
 			finishedMOG1 = true;
 
 			//display welcome
- 			welcome("MOG1 -> Set");
+   			welcome("MOG1 Set -> FN: " + to_string(i));
+
 		}
 
 		//controlling MOG2 detector
@@ -164,7 +170,8 @@ void objectDetection(int FRAME_RATE) {
 			finishedMOG2 = true;
 
 			//display welcome menu
- 			welcome("MOG2 -> Set");
+   			welcome("MOG2 Set -> FN: " + to_string(i));
+
 		}
 	}
 

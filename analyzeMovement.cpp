@@ -107,7 +107,7 @@ void analyzeMovement()
 	putText(drawCoordinatesOnFrameXY,
 		(to_string(xLearnedMovement) + "|"
 				+ to_string(yLearnedMovement)), Point(0, 30),
-		CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(0, 0, 255), 1,
+		CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(255, 255, 0), 1,
 		CV_AA, false);
 
 	putText(drawCoordinatesOnFrameSpeed,
@@ -117,7 +117,7 @@ void analyzeMovement()
 
 	putText(drawCoordinatesOnFrame, to_string(learnedAngle),
 			Point(0, 30), CV_FONT_HERSHEY_SIMPLEX, 1,
-			cvScalar(0, 0, 255), 1, CV_AA, false);
+			cvScalar(255, 255, 0), 1, CV_AA, false);
 
 	//creating distance threshold
 	const int distanceThreshold = 50;
@@ -330,7 +330,7 @@ void analyzeMovement()
 
 				//write to frame
 				putText(drawCoordinatesOnFrameXY, movementStr, bestPoint,
-										CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(255, 255, 0), 1,
+										CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(0, 0, 255), 1,
 										CV_AA, false);
 
 				displayFrame("XY Movement", drawCoordinatesOnFrameXY, true);
@@ -340,7 +340,7 @@ void analyzeMovement()
 
 				//string to display
 				String tmpToDisplay =
-						"ANOMALY DETECTED (ANGLE) -> Frame Number: "
+						" UNCONFIRMED ANOMALY DETECTED (ANGLE) -> Frame Number: "
 								+ to_string(i);
 
 				//display welcome
@@ -367,7 +367,7 @@ void analyzeMovement()
 
 				//write to frame
 				putText(drawCoordinatesOnFrameXY, movementStr, bestPoint,
-						CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(0, 0, 255), 1,
+						CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(255, 255, 0), 1,
 						CV_AA, false);
 
 				displayFrame("XY Movement", drawCoordinatesOnFrameXY, true);

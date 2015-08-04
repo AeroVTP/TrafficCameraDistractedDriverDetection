@@ -44,6 +44,9 @@ using namespace cv;
 //method to display frame
 void displayFrame(string filename, Mat matToDisplay) {
 	extern bool debug;
+
+	waitKey(30);
+
 	//if in debug mode and Mat is not empty
 	if (debug && matToDisplay.size[0] != 0) {
 		imshow(filename, matToDisplay);
@@ -57,6 +60,8 @@ void displayFrame(string filename, Mat matToDisplay) {
 //method to display frame overriding debug
 void displayFrame(string filename, Mat matToDisplay, bool override)
 {
+	waitKey(30);
+
 	//if override and Mat is not emptys
 	if (override && matToDisplay.size[0] != 0 && filename != "Welcome")
 	{

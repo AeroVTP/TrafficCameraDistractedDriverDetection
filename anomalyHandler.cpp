@@ -5,7 +5,6 @@
  *      Author: Vidur
  */
 
-
 //include opencv library files
 #include "opencv2/highgui/highgui.hpp"
 #include <opencv2/objdetect/objdetect.hpp>
@@ -51,6 +50,11 @@ void anomalyHandler(bool detected, bool finishing)
 	extern int lastAnomalyDetectedFN;
 	extern int numberOfAnomaliesDetected;
 	extern int i;
+	extern string fileTime;
+	extern vector<Mat> globalFrames;
+
+	const int anomalyMemory = 20;
+	const int anomalyCountThreshold = 10;
 
 	//if not in exiting zone
 	if(!finishing)
@@ -62,20 +66,20 @@ void anomalyHandler(bool detected, bool finishing)
 			lastAnomalyDetectedFN = i;
 
 			//if 10 anomalies detected
-			if(numberOfAnomaliesDetected > 10)
+			if(numberOfAnomaliesDetected > anomalyCountThreshold)
 			{
 				//report final anomaly detected
 				cout << "ANOMALY DETECTED" << endl;
-				welcome("ANOMALY DETECTED");
+				imwrite("Anomaly Car" + fileTime +".jpg", globalFrames[i]);
+				welcome(" CONFIRMED ANOMALY DETECTED");
 			}
 		}
 
 		//if memory past last anomaly
-		else if(lastAnomalyDetectedFN < i - 45)
+		else if(lastAnomalyDetectedFN < i - anomalyMemory)
 		{
 			//reset anomaly counter
-			welcome("NORMAL OPS");
-			numberOfAnomaliesDetected = 0;
+ 			numberOfAnomaliesDetected = 0;
 		}
 	}
 }

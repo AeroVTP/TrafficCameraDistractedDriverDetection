@@ -1,0 +1,1338 @@
+/*
+ * analyzeMovement.cpp
+ *
+ *  Created on: Aug 3, 2015
+ *      Author: Vidur
+ */
+
+//include opencv library files
+#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/gpu/gpu.hpp"
+#include <opencv2/nonfree/ocl.hpp>
+#include <opencv/cv.h>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/core/core.hpp>
+#include "bgfg_vibe.hpp"
+
+//include c++ files
+#include <iostream>
+#include <fstream>
+#include <ctime>
+#include <time.h>
+#include <thread>
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits>
+#include <math.h>
+#include <algorithm>
+#include <vector>
+#include <pthread.h>
+#include <cstdlib>
+
+#include "findMin.h"
+#include "sortCoordinates.h"
+#include "displayFrame.h"
+#include "welcome.h"
+#include "checkBasicXYAnomaly.h"
+#include "anomalyHandler.h"
+
+using namespace std;
+using namespace cv;
+
+//defining contant PI
+#define PI 3.14159265
+
+//method to analyze all movement
+void analyzeMovement()
+{
+	//setting y displacement threshold
+	const int yDisplacementThreshold = 20;
+
+	//booleans to detect anomalies
+	bool detected = false;
+	bool finishing = false;
+
+	extern vector<vector<Point> > vectorOfDetectedCars;
+	extern Mat backgroundFrameMedianColor;
+	extern double xLearnedMovement;
+	extern double yLearnedMovement;
+	extern double learnedSpeedAverage;
+	extern double learnedAngle;
+	extern vector<double> distanceFromNormal;
+	extern vector<Point> distanceFromNormalPoints;
+	extern double xAverageMovement;
+	extern double xDisplacement;
+	extern double yDisplacement;
+	extern double yLearnedMovement;
+	extern double yAverageMovement;
+	extern double yAverageCounter;
+ 	extern double learnedSpeed;
+    extern double currentSpeed;
+	extern double learnedDistanceAverage;
+	extern double learnedDistance;
+	extern double learnedDistanceCounter;
+	extern double currentDistance;
+	extern Mat distanceFrameAnomaly;
+	extern double xAverageCounter;
+	extern double learnedAggregate;
+	extern double currentAngle;
+	extern int numberOfAnomaliesDetected;
+	extern Mat drawAnomalyCar;
+	extern int i;
+	extern int bufferMemory;
+	extern int mlBuffer;
+	extern Point tmpDetectPoint;
+	extern int FRAME_WIDTH;
+
+	//vector of current and previous detects
+	vector<Point> currentDetects = vectorOfDetectedCars[vectorOfDetectedCars.size() - 1];
+	vector<Point> prevDetects = vectorOfDetectedCars[vectorOfDetectedCars.size()- 2];
+
+	//frames to draw movement properties
+	Mat drawCoordinatesOnFrame;
+	Mat drawCoordinatesOnFrameXY;
+	Mat drawCoordinatesOnFrameSpeed;
+
+	//saving background frame to draw on
+	backgroundFrameMedianColor.copyTo(drawCoordinatesOnFrame);
+	backgroundFrameMedianColor.copyTo(drawCoordinatesOnFrameXY);
+	backgroundFrameMedianColor.copyTo(drawCoordinatesOnFrameSpeed);
+
+	//draw learned models
+	putText(drawCoordinatesOnFrameXY,
+		(to_string(xLearnedMovement) + "|"
+				+ to_string(yLearnedMovement)), Point(0, 30),
+		CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(0, 0, 255), 1,
+		CV_AA, false);
+
+	putText(drawCoordinatesOnFrameSpeed,
+		to_string(learnedSpeedAverage), Point(0, 30),
+		CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(255, 255, 0), 1,
+		CV_AA, false);
+
+	putText(drawCoordinatesOnFrame, to_string(learnedAngle),
+			Point(0, 30), CV_FONT_HERSHEY_SIMPLEX, 1,
+			cvScalar(0, 0, 255), 1, CV_AA, false);
+
+	//creating distance threshold
+	const int distanceThreshold = 50;
+
+	//finding almost number of detects
+	int least = findMin(currentDetects.size(), prevDetects.size());
+
+	//cycling through detects
+	for (int v = 0; v < least; v++)
+	{
+		//sort detected coordinates
+		currentDetects = sortCoordinates(currentDetects);
+		prevDetects = sortCoordinates(prevDetects);
+
+		//creating lowest distance with largest number
+		double lowestDistance = INT_MAX;
+
+		//variable to store current distance
+		double distance;
+
+		//creating point objects
+		Point tmpPoint;
+		Point tmpDetectPoint;
+		Point bestPoint;
+
+		//cycling through detects
+		for (int j = 0; j < prevDetects.size(); j++)
+		{
+			//saving points
+			tmpDetectPoint = prevDetects[j];
+			tmpPoint = currentDetects[v];
+
+			//calculating distance
+			distance = sqrt(abs(tmpDetectPoint.x - tmpPoint.x)
+					* (abs(tmpDetectPoint.y - tmpPoint.y)));
+
+			//if distance is less than previous lowest distance
+			if (distance < lowestDistance) {
+				//resetting lowest distance
+				lowestDistance = distance;
+
+				//saving point which matches the best
+				bestPoint = tmpDetectPoint;
+			}
+ 		}
+
+ 		//determinig displacements
+		int xDisplacement = abs(bestPoint.x - tmpPoint.x);
+		int yDisplacement = abs(bestPoint.y - tmpPoint.y);
+
+		//creating frame to display all anomalies
+		Mat distanceFrameAnomaly;
+
+		//saving median image background
+		backgroundFrameMedianColor.copyTo(distanceFrameAnomaly);
+
+		//cycling through all coordinates
+		for (int d = 0; d < distanceFromNormal.size(); d++)
+		{
+			//sum all distances
+			learnedDistanceCounter++;
+			currentDistance = distanceFromNormal[d];
+			learnedDistance += distanceFromNormal[d];
+
+			//string to display current distance
+			String movementStr = to_string(currentDistance);
+
+			//write anomalies to frame
+			putText(distanceFrameAnomaly, movementStr,
+					distanceFromNormalPoints[d], CV_FONT_HERSHEY_SIMPLEX, 1,
+					cvScalar(254, 254, 0), 1, CV_AA, false);
+
+			//write learned distance
+			putText(distanceFrameAnomaly, to_string(learnedDistanceAverage),
+					Point(0, 30), CV_FONT_HERSHEY_SIMPLEX, 1,
+					cvScalar(254, 254, 0), 1, CV_AA, false);
+		}
+
+		//erase vectors for next run
+		distanceFromNormal.erase(distanceFromNormal.begin(), distanceFromNormal.end());
+		distanceFromNormalPoints.erase(distanceFromNormalPoints.begin(), distanceFromNormalPoints.end());
+
+		displayFrame("distanceFrameAnomaly", distanceFrameAnomaly, true);
+
+		//average all learned distances
+		learnedDistanceAverage = learnedDistance / learnedDistanceCounter;
+
+		//if points are matched
+		if (lowestDistance < distanceThreshold && yDisplacement < yDisplacementThreshold)
+		{
+			//suming all displacements
+			xAverageMovement += xDisplacement;
+			yAverageMovement += yDisplacement;
+
+			//adding to counter
+			xAverageCounter++;
+			yAverageCounter++;
+
+			//averaging movement
+			xLearnedMovement = (xAverageMovement / xAverageCounter);
+			yLearnedMovement = (yAverageMovement / yAverageCounter);
+
+			//determining current speed
+			currentSpeed = sqrt(xDisplacement * yDisplacement);
+
+			//adding to total speed
+			learnedSpeed += currentSpeed;
+
+			//saving average speed
+			learnedSpeedAverage = learnedSpeed / xAverageCounter;
+
+			//calculating current angle
+			double currentAngle = ((atan((double) yDisplacement) / (double) xDisplacement)) * 180 / PI;
+
+			//saving angle into float
+			float currentAngleFloat = (float) currentAngle;
+
+			//if angle is more than 360
+			if (currentAngle > 360)
+			{
+				//set angle as 0
+				currentAngle = 0;
+ 			}
+
+ 			//if it is invalid
+			if (currentAngleFloat != currentAngleFloat)
+			{
+				//set angle as 0
+				currentAngle = 0;
+ 			}
+
+ 			//aggreage total angle
+			learnedAggregate += currentAngle;
+
+			//average angle
+			learnedAngle = learnedAggregate / xAverageCounter;
+
+			//if too fast
+			if (learnedSpeedAverage * 3 < currentSpeed)
+			{
+				//create current speed
+				String movementStr = to_string(currentSpeed);
+
+				//write to frame
+				putText(drawCoordinatesOnFrameSpeed, movementStr, bestPoint,
+						CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(0, 0, 255), 1,
+						CV_AA, false);
+
+				//flag is detected
+				detected = true;
+
+				//aggregate number of anomalies detected
+				numberOfAnomaliesDetected++;
+
+				displayFrame("Speed Movement", drawCoordinatesOnFrameSpeed,
+						true);
+			}
+
+			//if normal speed
+			else
+			{
+				//create current speed
+				String movementStr = to_string(currentSpeed);
+
+				//write to frame
+				putText(drawCoordinatesOnFrameSpeed, movementStr, bestPoint,
+						CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(255, 255, 0), 1,
+						CV_AA, false);
+
+				displayFrame("Speed Movement", drawCoordinatesOnFrame, true);
+			}
+
+			if (currentAngle > 15)
+			{
+				//create current angle
+				String movementStr = to_string(currentAngle);
+
+				//write to frame
+				putText(drawCoordinatesOnFrame, movementStr, bestPoint,
+						CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(0, 0, 255), 1,
+						CV_AA, false);
+
+				//flag is detected
+				detected = true;
+
+				//aggregate number of anomalies detected
+				numberOfAnomaliesDetected++;
+
+				displayFrame("Angular Movement", drawCoordinatesOnFrame, true);
+			}
+			else
+			{
+				//create current angle
+				String movementStr = to_string(currentAngle);
+
+				//write to frame
+				putText(drawCoordinatesOnFrame, movementStr, bestPoint,
+						CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(255, 255, 0), 1,
+						CV_AA, false);
+
+				displayFrame("Angular Movement", drawCoordinatesOnFrame, true);
+			}
+
+			//is moving to much in the y direction
+			if (yDisplacement > yLearnedMovement * 3)
+			{
+				//create current x y displacement
+				String movementStr = to_string(xDisplacement) + "|"
+						+ to_string(yDisplacement);
+
+				//write to frame
+				putText(drawCoordinatesOnFrameXY, movementStr, bestPoint,
+										CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(255, 255, 0), 1,
+										CV_AA, false);
+
+				displayFrame("XY Movement", drawCoordinatesOnFrameXY, true);
+
+				//draw anomaly
+				circle(drawAnomalyCar, bestPoint, 5, Scalar(0, 0, 255), -1);
+
+				//string to display
+				String tmpToDisplay =
+						"ANOMALY DETECTED (ANGLE) -> Frame Number: "
+								+ to_string(i);
+
+				//display welcome
+				welcome(tmpToDisplay);
+
+				//display anomaly message
+				cout << " !!!!!!!!!!!ANOMALY DETECTED (ANGLE)!!!!!!!!!!!"
+						<< endl;
+
+				//flag is detected
+				detected = true;
+
+				//aggregate number of anomalies detected
+				numberOfAnomaliesDetected++;
+
+				displayFrame("Anomaly Car Detect Frame", drawAnomalyCar, true);
+ 			}
+
+			else
+			{
+				//create current x y displacement
+				String movementStr = to_string(xDisplacement) + "|"
+						+ to_string(yDisplacement);
+
+				//write to frame
+				putText(drawCoordinatesOnFrameXY, movementStr, bestPoint,
+						CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(0, 0, 255), 1,
+						CV_AA, false);
+
+				displayFrame("XY Movement", drawCoordinatesOnFrameXY, true);
+			}
+
+			//if past buffer memory, and inside the tracking area
+			if (i > (bufferMemory + mlBuffer + 3) && tmpDetectPoint.x < FRAME_WIDTH - 30)
+			{
+				//check if anomalous
+				checkBasicXYAnomaly(xDisplacement, yDisplacement,
+						tmpDetectPoint, currentAngle);
+			}
+		}
+	}
+
+	//start anomaly handler
+	anomalyHandler(detected, false);
+}
+
+/*
+ * anomalyHandler.cpp
+ *
+ *  Created on: Aug 3, 2015
+ *      Author: Vidur
+ */
+
+
+//include opencv library files
+#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/gpu/gpu.hpp"
+#include <opencv2/nonfree/ocl.hpp>
+#include <opencv/cv.h>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/core/core.hpp>
+#include "bgfg_vibe.hpp"
+
+//include c++ files
+#include <iostream>
+#include <fstream>
+#include <ctime>
+#include <time.h>
+#include <thread>
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits>
+#include <math.h>
+#include <algorithm>
+#include <vector>
+#include <pthread.h>
+#include <cstdlib>
+
+#include "findMin.h"
+#include "sortCoordinates.h"
+#include "displayFrame.h"
+#include "welcome.h"
+#include "checkBasicXYAnomaly.h"
+#include "anomalyHandler.h"
+
+using namespace std;
+using namespace cv;
+
+//anomaly handler to reduce false-positives
+void anomalyHandler(bool detected, bool finishing)
+{
+	extern int lastAnomalyDetectedFN;
+	extern int numberOfAnomaliesDetected;
+	extern int i;
+
+	//if not in exiting zone
+	if(!finishing)
+	{
+		//if detected anomaly
+		if(detected)
+		{
+			//last anomaly detected
+			lastAnomalyDetectedFN = i;
+
+			//if 10 anomalies detected
+			if(numberOfAnomaliesDetected > 10)
+			{
+				//report final anomaly detected
+				cout << "ANOMALY DETECTED" << endl;
+				welcome("ANOMALY DETECTED");
+			}
+		}
+
+		//if memory past last anomaly
+		else if(lastAnomalyDetectedFN < i - 45)
+		{
+			//reset anomaly counter
+			welcome("NORMAL OPS");
+			numberOfAnomaliesDetected = 0;
+		}
+	}
+}
+
+
+/*
+ * averageCoordinates.cpp
+ *
+ *  Created on: Aug 3, 2015
+ *      Author: Vidur
+ */
+
+//include opencv library files
+#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/gpu/gpu.hpp"
+#include <opencv2/nonfree/ocl.hpp>
+#include <opencv/cv.h>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/core/core.hpp>
+#include "bgfg_vibe.hpp"
+
+//include c++ files
+#include <iostream>
+#include <fstream>
+#include <ctime>
+#include <time.h>
+#include <thread>
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits>
+#include <math.h>
+#include <algorithm>
+#include <vector>
+#include <pthread.h>
+#include <cstdlib>
+
+#include "sortCoordinates.h"
+
+//defining contant PI
+#define PI 3.14159265
+
+//namespaces for convenience
+using namespace cv;
+using namespace std;
+
+//average multiple points
+Point averagePoints(vector<Point> coordinates) {
+
+	//if there is more than 1 coordinate
+	if (coordinates.size() > 1) {
+
+ 		//variables to sum x and y coordinates
+		double xCoordinate = 0;
+		double yCoordinate = 0;
+
+		//cycling through all coordinates and summing
+		for (int v = 0; v < coordinates.size(); v++) {
+			xCoordinate += coordinates[v].x;
+			yCoordinate += coordinates[v].y;
+		}
+
+		//creating average point
+		Point tmpPoint(xCoordinate / coordinates.size(),
+				yCoordinate / coordinates.size());
+		//returning average point
+		return tmpPoint;
+	}
+
+	//if one point
+	else if (coordinates.size() == 1) {
+		cout << "ONLY  POINT " << coordinates.size() << endl;
+
+		//return 1 point
+		return coordinates[0];
+	}
+
+	//if no points
+	else {
+		cout << "ONLY POINT " << coordinates.size() << endl;
+
+		//create point
+		return Point(0, 0);
+	}
+}
+
+
+//average car points
+vector<Point> averageCoordinates(vector<Point> coordinates, int distanceThreshold) {
+
+	//if more than 1 point
+	if (coordinates.size() > 1)
+	{
+		//vectors of points
+		vector<Point> destinationCoordinates;
+		vector<Point> pointsToAverage;
+
+		//sort coordinates
+		coordinates = sortCoordinates(coordinates);
+
+		//saving tmp point
+		Point tmpPoint = coordinates[0];
+
+		//control boolean
+		bool enteredOnce = false;
+
+		//cycling through all coordinates
+		for (int v = 0; v < coordinates.size(); v++) {
+
+			//if distance is above threshold
+			if (sqrt(
+					(abs(tmpPoint.y - coordinates[v].y)
+							* (abs(tmpPoint.x - coordinates[v].x))))
+					> distanceThreshold) {
+
+				//save averaged cordinates
+ 				destinationCoordinates.push_back(averagePoints(pointsToAverage));
+
+ 				//read new tmp point
+				tmpPoint = coordinates[v];
+
+				//erase vector of points to average
+				pointsToAverage.erase(pointsToAverage.begin(), pointsToAverage.end());
+
+				//control boolean
+				bool enteredOnce = true;
+			}
+
+			//if distance is below threshold
+			else
+			{
+				//begin filling points to average
+ 				pointsToAverage.push_back(coordinates[v]);
+			}
+		}
+
+		//if not entered once
+		if (!enteredOnce) {
+			//average all coordinates
+			destinationCoordinates.push_back(averagePoints(pointsToAverage));
+		}
+
+		//if only 1 point
+		else if (pointsToAverage.size() == 1) {
+			//save point
+			destinationCoordinates.push_back(pointsToAverage[0]);
+		}
+
+		//if more than 1 point
+		else if (pointsToAverage.size() > 0) {
+			//average points
+			destinationCoordinates.push_back(averagePoints(pointsToAverage));
+		}
+
+		//return processed coordinates
+		return destinationCoordinates;
+	}
+
+	//if 1 coordinate
+	else if (coordinates.size() > 0) {
+		cout << " RETURNING 1 POINT COOORDINATE" << endl;
+
+		//return coordinates
+		return coordinates;
+	}
+
+	//if no coordinates
+	else {
+		cout << " FIRST EMPTY POINT MADE ONE UP " << endl;
+
+		//create point
+		coordinates.push_back(Point(0, 0));
+
+		//return vector
+		return coordinates;
+	}
+}
+
+
+
+#include "bgfg_vibe.hpp"
+
+bgfg_vibe::bgfg_vibe():R(20),N(20),noMin(2),phi(0)
+{
+    initDone=false;
+    rnd=cv::theRNG();
+    ri=0;
+}
+void bgfg_vibe::init()
+{
+    for(int i=0;i<rndSize;i++)
+    {
+        rndp[i]=rnd(phi);
+        rndn[i]=rnd(N);
+        rnd8[i]=rnd(8);
+    }
+}
+void bgfg_vibe::setphi(int phi)
+{
+    this->phi=phi;
+    for(int i=0;i<rndSize;i++)
+    {
+        rndp[i]=rnd(phi);
+    }
+}
+void bgfg_vibe::init_model(cv::Mat& firstSample)
+{
+    std::vector<cv::Mat> channels;
+    split(firstSample,channels);
+    if(!initDone)
+    {
+        init();
+        initDone=true;
+    }
+    model=new Model;
+    model->fgch= new cv::Mat*[channels.size()];
+    model->samples=new cv::Mat**[N];
+    model->fg=new cv::Mat(cv::Size(firstSample.cols,firstSample.rows), CV_8UC1);
+    for(size_t s=0;s<channels.size();s++)
+    {
+        model->fgch[s]=new cv::Mat(cv::Size(firstSample.cols,firstSample.rows), CV_8UC1);
+        cv::Mat** samples= new cv::Mat*[N];
+        for(int i=0;i<N;i++)
+        {
+            samples[i]= new cv::Mat(cv::Size(firstSample.cols,firstSample.rows), CV_8UC1);
+        }
+        for(int i=0;i<channels[s].rows;i++)
+        {
+            int ioff=channels[s].step.p[0]*i;
+            for(int j=0;j<channels[0].cols;j++)
+            {
+                for(int k=0;k<1;k++)
+                {
+                    (samples[k]->data + ioff)[j]=channels[s].at<uchar>(i,j);
+                }
+                (model->fgch[s]->data + ioff)[j]=0;
+
+                if(s==0)(model->fg->data + ioff)[j]=0;
+            }
+        }
+        model->samples[s]=samples;
+    }
+}
+void bgfg_vibe::fg1ch(cv::Mat& frame,cv::Mat** samples,cv::Mat* fg)
+{
+    int step=frame.step.p[0];
+    for(int i=1;i<frame.rows-1;i++)
+    {
+        int ioff= step*i;
+        for(int j=1;j<frame.cols-1;j++)
+        {
+            int count =0,index=0;
+            while((count<noMin) && (index<N))
+            {
+                int dist= (samples[index]->data + ioff)[j]-(frame.data + ioff)[j];
+                if(dist<=R && dist>=-R)
+                {
+                    count++;
+                }
+                index++;
+            }
+            if(count>=noMin)
+            {
+                ((fg->data + ioff))[j]=0;
+                int rand= rndp[rdx];
+                if(rand==0)
+                {
+                    rand= rndn[rdx];
+                    (samples[rand]->data + ioff)[j]=(frame.data + ioff)[j];
+                }
+                rand= rndp[rdx];
+                int nxoff=ioff;
+                if(rand==0)
+                {
+                    int nx=i,ny=j;
+                    int cases= rnd8[rdx];
+                    switch(cases)
+                    {
+                    case 0:
+                        //nx--;
+                        nxoff=ioff-step;
+                        ny--;
+                        break;
+                    case 1:
+                        //nx--;
+                        nxoff=ioff-step;
+                        ny;
+                        break;
+                    case 2:
+                        //nx--;
+                        nxoff=ioff-step;
+                        ny++;
+                        break;
+                    case 3:
+                        //nx++;
+                        nxoff=ioff+step;
+                        ny--;
+                        break;
+                    case 4:
+                        //nx++;
+                        nxoff=ioff+step;
+                        ny;
+                        break;
+                    case 5:
+                        //nx++;
+                        nxoff=ioff+step;
+                        ny++;
+                        break;
+                    case 6:
+                        //nx;
+                        ny--;
+                        break;
+                    case 7:
+                        //nx;
+                        ny++;
+                        break;
+                    }
+                    rand= rndn[rdx];
+                    (samples[rand]->data + nxoff)[ny]=(frame.data + ioff)[j];
+                }
+            }else
+            {
+                ((fg->data + ioff))[j]=255;
+            }
+        }
+    }
+}
+cv::Mat* bgfg_vibe::fg(cv::Mat& frame)
+{
+    std::vector<cv::Mat> channels;
+    split(frame,channels);
+    for(size_t i=0;i<channels.size();i++)
+    {
+        fg1ch(channels[i],model->samples[i],model->fgch[i]);
+        if(i>0 && i<2)
+        {
+            bitwise_or(*model->fgch[i-1],*model->fgch[i],*model->fg);
+        }
+        if(i>=2)
+        {
+            bitwise_or(*model->fg,*model->fgch[i],*model->fg);
+        }
+    }
+    if(channels.size()==1) return model->fgch[0];
+    return model->fg;
+}
+/*
+ * blurFrame.cpp
+ *
+ *  Created on: Aug 4, 2015
+ *      Author: Vidur
+ */
+
+//include opencv library files
+#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/gpu/gpu.hpp"
+#include <opencv2/nonfree/ocl.hpp>
+#include <opencv/cv.h>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/core/core.hpp>
+#include "bgfg_vibe.hpp"
+
+//include c++ files
+#include <iostream>
+#include <fstream>
+#include <ctime>
+#include <time.h>
+#include <thread>
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits>
+#include <math.h>
+#include <algorithm>
+#include <vector>
+#include <pthread.h>
+#include <cstdlib>
+
+#include "averageCoordinates.h"
+#include "checkLanePosition.h"
+#include "analyzeMovement.h"
+#include "displayFrame.h"
+#include "welcome.h"
+#include "displayCoordinate.h"
+#include "trackingML.h"
+#include "displayCoordinates.h"
+#include "processExit.h"
+#include "computeRunTime.h"
+
+#include "gaussianMixtureModel.h"
+#include "opticalFlowFarneback.h"
+ #include "blurFrame.h"
+
+//namespaces for convenience
+using namespace cv;
+using namespace std;
+
+//method to blur Mat using custom kernel size
+Mat blurFrame(string blurType, Mat sourceDiffFrame, int blurSize) {
+	extern bool debug;
+
+	//Mat to hold blurred frame
+	Mat blurredFrame;
+
+	//if gaussian blur
+	if (blurType == "gaussian") {
+		//blur frame using custom kernel size
+		blur(sourceDiffFrame, blurredFrame, Size(blurSize, blurSize),
+				Point(-1, -1));
+
+		//return blurred frame
+		return blurredFrame;
+	}
+
+	//if blur type not implemented
+	else {
+		//report not implemented
+		if (debug)
+			cout << blurType << " type of blur not implemented yet" << endl;
+
+		//return original frame
+		return sourceDiffFrame;
+	}
+
+}
+
+
+
+/*
+ * calcMedian.cpp
+ *
+ *  Created on: Aug 4, 2015
+ *      Author: Vidur
+ */
+
+//include opencv library files
+#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/gpu/gpu.hpp"
+#include <opencv2/nonfree/ocl.hpp>
+#include <opencv/cv.h>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/core/core.hpp>
+#include "bgfg_vibe.hpp"
+
+//include c++ files
+#include <iostream>
+#include <fstream>
+#include <ctime>
+#include <time.h>
+#include <thread>
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits>
+#include <math.h>
+#include <algorithm>
+#include <vector>
+#include <pthread.h>
+#include <cstdlib>
+
+#include "averageCoordinates.h"
+#include "checkLanePosition.h"
+#include "analyzeMovement.h"
+#include "displayFrame.h"
+#include "welcome.h"
+#include "displayCoordinate.h"
+#include "trackingML.h"
+#include "displayCoordinates.h"
+#include "processExit.h"
+#include "computeRunTime.h"
+
+#include "gaussianMixtureModel.h"
+#include "opticalFlowFarneback.h"
+
+#include "vibeBackgroundSubtraction.h"
+
+#include "mogDetection.h"
+#include "mogDetection2.h"
+
+#include "medianDetection.h"
+
+#include "grayScaleFrameMedian.h"
+
+//namespaces for convenience
+using namespace cv;
+using namespace std;
+
+//method to calculate median of vector of integers
+double calcMedian(vector<int> integers) {
+	//double to store non-int median
+	double median;
+
+	//read size of vector
+	size_t size = integers.size();
+
+	//sort array
+	sort(integers.begin(), integers.end());
+
+	//if even number of elements
+	if (size % 2 == 0) {
+		//median is middle elements averaged
+		median = (integers[size / 2 - 1] + integers[size / 2]) / 2;
+	}
+
+	//if odd number of elements
+	else {
+		//median is middle element
+		median = integers[size / 2];
+	}
+
+	//return the median value
+	return median;
+}
+
+
+
+/*
+ * calculateDeviance.cpp
+ *
+ *  Created on: Aug 3, 2015
+ *      Author: Vidur
+ */
+
+//include opencv library files
+#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/gpu/gpu.hpp"
+#include <opencv2/nonfree/ocl.hpp>
+#include <opencv/cv.h>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/core/core.hpp>
+#include "bgfg_vibe.hpp"
+
+//include c++ files
+#include <iostream>
+#include <fstream>
+#include <ctime>
+#include <time.h>
+#include <thread>
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits>
+#include <math.h>
+#include <algorithm>
+#include <vector>
+#include <pthread.h>
+#include <cstdlib>
+
+#include "averageCoordinates.h"
+#include "checkLanePosition.h"
+#include "analyzeMovement.h"
+#include "displayFrame.h"
+#include "welcome.h"
+#include "displayCoordinate.h"
+#include "processCoordinates.h"
+#include "individualTracking.h"
+#include "registerFirstCar.h"
+#include "learnedCoordinate.h"
+
+//method to calculate deviance
+void calculateDeviance() {
+
+	extern Mat backgroundFrameMedianColor;
+	extern vector< vector<Point> > learnedCoordinates;
+
+	//train LASM
+	learnedCoordinate();
+
+	//Mat to display LASM
+	Mat tmpToDisplay;
+
+	//save background
+	backgroundFrameMedianColor.copyTo(tmpToDisplay);
+
+	//cycle through LASM coordinates
+	for (int v = 0; v < learnedCoordinates.size(); v++) {
+		for (int j = 0; j < learnedCoordinates[v].size(); j++) {
+			//read tmpPoint
+			Point tmpPoint = learnedCoordinates[v][j];
+
+			//create top left point
+			Point tmpPointTopLeft(tmpPoint.x - .01, tmpPoint.y + .01);
+
+			//create bottom right point
+			Point tmpPointBottomRight(tmpPoint.x + .01, tmpPoint.y - .01);
+
+			//create rectangle to display
+	        rectangle( tmpToDisplay, tmpPointTopLeft, tmpPointBottomRight, Scalar(255, 255, 0), 1);
+		}
+	}
+	displayFrame("Learned Path", tmpToDisplay, true);
+}
+
+
+
+/*
+ * calculateFPS.cpp
+ *
+ *  Created on: Aug 4, 2015
+ *      Author: Vidur
+ */
+
+//include opencv library files
+#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/gpu/gpu.hpp"
+#include <opencv2/nonfree/ocl.hpp>
+#include <opencv/cv.h>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/core/core.hpp>
+#include "bgfg_vibe.hpp"
+
+//include c++ files
+#include <iostream>
+#include <fstream>
+#include <ctime>
+#include <time.h>
+#include <thread>
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits>
+#include <math.h>
+#include <algorithm>
+#include <vector>
+#include <pthread.h>
+#include <cstdlib>
+
+#include "averageCoordinates.h"
+#include "checkLanePosition.h"
+#include "analyzeMovement.h"
+#include "displayFrame.h"
+#include "welcome.h"
+#include "displayCoordinate.h"
+#include "trackingML.h"
+#include "displayCoordinates.h"
+#include "processExit.h"
+#include "computeRunTime.h"
+#include "objectDetection.h"
+
+#include "slidingWindowNeighborDetector.h"
+#include "cannyContourDetector.h"
+#include "opticalFlowFarneback.h"
+#include "opticalFlowAnalysisObjectDetection.h"
+
+#include "currentDateTime.h"
+#include "type2StrTest.h"
+#include "morphology.h"
+
+#include "writeInitialStats.h"
+#include "calculateFPS.h"
+
+//namespaces for convenience
+using namespace cv;
+using namespace std;
+
+
+//calculate time for each iteration
+double calculateFPS(clock_t tStart, clock_t tFinal) {
+	//return frames per second
+	return 1 / ((((float) tFinal - (float) tStart) / CLOCKS_PER_SEC));
+}
+
+
+
+/*
+ * cannyContourDetector.cpp
+ *
+ *  Created on: Aug 4, 2015
+ *      Author: Vidur
+ */
+
+//include opencv library files
+#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/gpu/gpu.hpp"
+#include <opencv2/nonfree/ocl.hpp>
+#include <opencv/cv.h>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/core/core.hpp>
+#include "bgfg_vibe.hpp"
+
+//include c++ files
+#include <iostream>
+#include <fstream>
+#include <ctime>
+#include <time.h>
+#include <thread>
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits>
+#include <math.h>
+#include <algorithm>
+#include <vector>
+#include <pthread.h>
+#include <cstdlib>
+
+#include "averageCoordinates.h"
+#include "checkLanePosition.h"
+#include "analyzeMovement.h"
+#include "displayFrame.h"
+#include "welcome.h"
+#include "displayCoordinate.h"
+#include "trackingML.h"
+#include "displayCoordinates.h"
+#include "processExit.h"
+#include "computeRunTime.h"
+
+#include "gaussianMixtureModel.h"
+#include "fillCoordinates.h"
+
+//namespaces for convenience
+using namespace cv;
+using namespace std;
+
+//method to draw canny contours
+Mat cannyContourDetector(Mat srcFrame) {
+	extern int FRAME_WIDTH;
+	extern int FRAME_HEIGHT;
+
+	//threshold for non-car objects or noise
+	const int thresholdNoiseSize = 200;
+	const int misDetectLargeSize = 600;
+
+	//instantiating Mat and Canny objects
+	Mat canny;
+	Mat cannyFrame;
+	vector<Vec4i> hierarchy;
+	typedef vector<vector<Point> > TContours;
+	TContours contours;
+
+	//run canny edge detector
+	Canny(srcFrame, cannyFrame, 300, 900, 3);
+	findContours(cannyFrame, contours, hierarchy, CV_RETR_CCOMP,
+			CV_CHAIN_APPROX_NONE);
+
+	//creating blank frame to draw on
+	Mat drawing = Mat::zeros(cannyFrame.size(), CV_8UC3);
+
+	//moments for center of mass
+	vector<Moments> mu(contours.size());
+	for (int i = 0; i < contours.size(); i++) {
+		mu[i] = moments(contours[i], false);
+	}
+
+	//get mass centers:
+	vector<Point2f> mc(contours.size());
+	for (int i = 0; i < contours.size(); i++) {
+		mc[i] = Point2f(mu[i].m10 / mu[i].m00, mu[i].m01 / mu[i].m00);
+	}
+
+	//for each detected contour
+	for (int v = 0; v < contours.size(); v++) {
+		//if large enough to be object
+		if (arcLength(contours[v], true) > thresholdNoiseSize
+				&& arcLength(contours[v], true) < misDetectLargeSize) {
+			if((mc[v].x > 30 && mc[v].x < FRAME_WIDTH - 60) && (mc[v].y > 30 && mc[v].y < FRAME_HEIGHT - 60))
+			{
+				//draw object and circle center point
+				drawContours(drawing, contours, v, Scalar(254, 254, 0), 2, 8,
+						hierarchy, 0, Point());
+				circle(drawing, mc[v], 4, Scalar(254, 254, 0), -1, 8, 0);
+			}
+			fillCoordinates(mc);
+		}
+	}
+
+	//return image with contours
+	return drawing;
+}
+
+
+/*
+ * checkBasicXYAnomaly.cpp
+ *
+ *  Created on: Aug 3, 2015
+ *      Author: Vidur
+ */
+
+//include opencv library files
+#include "opencv2/highgui/highgui.hpp"
+#include <opencv2/objdetect/objdetect.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/video/tracking.hpp>
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/gpu/gpu.hpp"
+#include <opencv2/nonfree/ocl.hpp>
+#include <opencv/cv.h>
+#include <opencv2/video/background_segm.hpp>
+#include <opencv2/core/core.hpp>
+#include "bgfg_vibe.hpp"
+
+//include c++ files
+#include <iostream>
+#include <fstream>
+#include <ctime>
+#include <time.h>
+#include <thread>
+#include <chrono>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits>
+#include <math.h>
+#include <algorithm>
+#include <vector>
+#include <pthread.h>
+#include <cstdlib>
+
+#include "averageCoordinates.h"
+#include "checkLanePosition.h"
+#include "analyzeMovement.h"
+#include "displayFrame.h"
+#include "welcome.h"
+#include "displayCoordinate.h"
+
+//namespaces for convenience
+using namespace cv;
+using namespace std;
+
+//boolean to determine if anomaly is detected
+bool checkBasicXYAnomaly(int xMovement, int yMovement, Point carPoint, double currentAngle) {
+
+	//thresholds to determine if anomaly
+	const double maxThreshold = 5;
+	const double minThreshold = -5;
+	const int maxMovement = 30;
+
+	const int angleThresholdMax = 10;
+	const int angleThresholdMin = -10;
+	const int angleThreshold = 20;
+
+	//if above angle threshold
+	if (currentAngle > angleThreshold)
+	{
+		//write coordinate
+		displayCoordinate(carPoint);
+		cout << " !!!!!!!!!!!ANOMALY DETECTED (ANGLE)!!!!!!!!!!!" << endl;
+		//is anomalous
+		return true;
+ 	}
+	else
+ 	{
+ 		//is normal
+ 		return false;
+ 	}
+}
+
+

@@ -92,8 +92,8 @@ void learnedCoordinate()
 					abs(existingPoint.y - tmpPoint.y)) != 0)
 			{
 				//display difference
-				cout << " DIFFERENCE FROM NORMAL " << to_string(sqrt( abs(existingPoint.x - tmpPoint.x) *
-					abs(existingPoint.y - tmpPoint.y))) << endl;
+				//cout << " DIFFERENCE FROM NORMAL " << to_string(sqrt( abs(existingPoint.x - tmpPoint.x) *
+				//	abs(existingPoint.y - tmpPoint.y))) << endl;
 			}
 
 		}
@@ -176,7 +176,7 @@ void learnedCoordinate()
 			}
 		}
 	}
-	displayFrame("distanceFrame", distanceFrame, true);
+	//displayFrame("distanceFrame", distanceFrame);
 }
 
 
