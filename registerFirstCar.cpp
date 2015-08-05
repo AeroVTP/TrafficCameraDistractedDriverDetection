@@ -55,6 +55,7 @@ void registerFirstCar() {
 	extern vector<Point> detectedCoordinates;
 	extern int FRAME_WIDTH;
 	extern vector<vector<Point> > carCoordinates;
+	extern int xLimiter;
 
 	//save all cars
 	vectorOfDetectedCars.push_back(detectedCoordinates);
@@ -63,8 +64,8 @@ void registerFirstCar() {
 	for (int v = 0; v < detectedCoordinates.size(); v++) {
 
 		//if in the starting area on either side
-		if (detectedCoordinates[v].x < 75 || detectedCoordinates[v].x >FRAME_WIDTH - 75) {
-			//creating vector of car coordinates
+		if(detectedCoordinates[v].x < (xLimiter * 1.5) || detectedCoordinates[v].y > FRAME_WIDTH - (xLimiter * 1.5)){
+ 			//creating vector of car coordinates
 			vector<Point> carCoordinate;
 
 			//saving car coordinates

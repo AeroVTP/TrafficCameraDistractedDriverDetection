@@ -61,8 +61,9 @@ Mat cannyContourDetector(Mat srcFrame) {
 	const int thresholdNoiseSize = 200;
 	const int misDetectLargeSize = 600;
 
-	const int xLimiter = 120;
-	const int yLimiter = 30;
+	extern int xLimiter;
+	extern int yLimiter;
+	extern int xFarLimiter;
 
 	//instantiating Mat and Canny objects
 	Mat canny;
@@ -96,7 +97,7 @@ Mat cannyContourDetector(Mat srcFrame) {
 		//if large enough to be object
 		if (arcLength(contours[v], true) > thresholdNoiseSize
 				&& arcLength(contours[v], true) < misDetectLargeSize) {
-			if((mc[v].x > xLimiter && mc[v].x < FRAME_WIDTH - xLimiter) && (mc[v].y > yLimiter && mc[v].y < FRAME_HEIGHT - yLimiter))
+			if((mc[v].x > xLimiter && mc[v].x < FRAME_WIDTH - xFarLimiter) && (mc[v].y > yLimiter && mc[v].y < FRAME_HEIGHT - yLimiter))
 			{
 				//draw object and circle center point
 				drawContours(drawing, contours, v, Scalar(254, 254, 0), 2, 8,

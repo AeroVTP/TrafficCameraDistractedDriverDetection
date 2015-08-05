@@ -51,6 +51,8 @@
 using namespace std;
 using namespace cv;
 
+const int gmmScalarFactor = 7;
+
 //defining format of data sent to threads
 struct thread_data {
 	//include int for data passing
@@ -69,6 +71,7 @@ void *calcGaussianMixtureModel(void *threadarg) {
 	extern int bufferMemory;
 	extern Mat cannyGMM;
 	extern int gaussianMixtureModelCompletion;
+
 	//perform deep copy
 	globalFrames[i].copyTo(gmmFrameRaw);
 
@@ -109,7 +112,7 @@ void *calcGaussianMixtureModel(void *threadarg) {
 
 		Mat gmmFrameSWNDCanny = gmmFrame;
 
-		if (i > bufferMemory * 3 - 1) {
+		if (i > bufferMemory * gmmScalarFactor - 1) {
 			//perform Canny
 			gmmFrameSWNDCanny = cannyContourDetector(gmmFrame);
 			displayFrame("CannyGMM", gmmFrameSWNDCanny);
@@ -125,7 +128,6 @@ void *calcGaussianMixtureModel(void *threadarg) {
 
 //method to handle GMM thread
 Mat gaussianMixtureModel() {
-
 	extern int i;
 	extern int bufferMemory;
 	extern Mat cannyGMM;
@@ -145,7 +147,7 @@ Mat gaussianMixtureModel() {
 			(void *) &threadData);
 
 	//return processed frame if completed
-	if (i > bufferMemory * 2)
+	if (i > bufferMemory * gmmScalarFactor)
 		return cannyGMM;
 	//return tmp frame if not finished
 	else

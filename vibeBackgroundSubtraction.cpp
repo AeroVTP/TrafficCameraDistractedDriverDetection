@@ -65,6 +65,8 @@ extern int vibeDetectionGlobalFrameCompletion;
 extern bgfg_vibe bgfg;
 extern Mat vibeBckFrame;
 
+const int trainingScalarFactor = 7;
+
 //defining format of data sent to threads
 struct thread_data {
 	//include int for data passing
@@ -120,7 +122,7 @@ void *computeVibeBackgroundThread(void *threadarg) {
 
 		Mat sWNDVibeCanny = sWNDVibe;
 
-		if (i > bufferMemory * 3 - 1) {
+		if (i > bufferMemory * trainingScalarFactor - 1) {
 			//performing canny
 			Mat sWNDVibeCanny = cannyContourDetector(sWNDVibe);
 			displayFrame("sWNDVibeCannycanny2", sWNDVibeCanny);

@@ -77,6 +77,7 @@ void initilizeMat() {
 	extern int FRAME_HEIGHT;
 	extern vector<vector<Point> > learnedCoordinates;
 	extern int FRAME_WIDTH;
+	extern vector< vector <int> > accessTimesInt;
 
 	const int numberOfLanes = 6;
 
@@ -112,6 +113,7 @@ void initilizeMat() {
 			vector<Point> tmpPointVector;
 			vector<Point> accessTimesFirstVect;
 			vector<int> accessTimesFirstVectInt;
+			vector <int> accessTimesVectorFirstLayer;
 
 			//stepping through all LASM coordinates
 			for (int v = 0; v < FRAME_WIDTH; v += 7) {
@@ -127,11 +129,13 @@ void initilizeMat() {
 				tmpPointVector.push_back(Point(v, normalLanePosition));
 				accessTimesFirstVect.push_back(Point(1, 0));
 				accessTimesFirstVectInt.push_back(0);
-
+				accessTimesVectorFirstLayer.push_back(1);
 			}
 
 			//save all vectors into LASM model
 			learnedCoordinates.push_back(tmpPointVector);
+
+			accessTimesInt.push_back(accessTimesVectorFirstLayer);
 		}
 	}
 }

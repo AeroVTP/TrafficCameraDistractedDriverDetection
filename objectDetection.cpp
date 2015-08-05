@@ -75,6 +75,8 @@ void objectDetection(int FRAME_RATE) {
 	extern int bufferMemory;
 	extern int mlBuffer;
 
+	const int longTermTrainingScalar = 7;
+
 	if (i > bufferMemory + 1) {
 				String tmpToDisplay = "Running Image Analysis -> Frame Number: "
 						+ to_string(i);
@@ -197,7 +199,7 @@ void objectDetection(int FRAME_RATE) {
 			&& tmpMOG2.channels() == 3 && ofaDetection.channels() == 3
 			&& tmpMedian.channels() == 3) {
 		//if all images are created and finished
-		if (i > bufferMemory * 3 + 2 && tmpMOG1.channels() == 3
+		if (i > bufferMemory * longTermTrainingScalar + 2 && tmpMOG1.channels() == 3
 				&& tmpMOG2.channels() == 3 && ofaDetection.channels() == 3
 				&& tmpMedian.channels() == 3 && tmpVibe.channels() == 3
 				&& gmmDetection.channels() == 3 && 1 == 2) {
@@ -235,6 +237,7 @@ void objectDetection(int FRAME_RATE) {
 	//report sync issue
 	else {
 		cout << "Sync Issue" << endl;
+		welcome("Sync Issue -> FN: " + to_string(i));
 	}
 
 }

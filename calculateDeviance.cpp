@@ -77,6 +77,7 @@ void calculateDeviance() {
 		}
 	}
 	displayFrame("Learned Path", tmpToDisplay, true);
+
 }
 
 

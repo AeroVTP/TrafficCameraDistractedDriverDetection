@@ -1,7 +1,7 @@
 //======================================================================================================
 // Name        : TrafficCameraDistractedDriverDetection.cpp
 // Author      : Vidur Prasad
-// Version     : 0.6.2
+// Version     : 0.6.3
 // Copyright   : Institute for the Development and Commercialization of Advanced Sensor Technology Inc.
 // Description : Detect Drunk, Distracted, and Anomalous Driving Using Traffic Cameras
 //======================================================================================================
@@ -85,6 +85,13 @@ int FRAME_HEIGHT;
 int FRAME_WIDTH;
 int FRAME_RATE;
 
+//x and y car entry
+int xLimiter = 120;
+int yLimiter = 30;
+int xFarLimiter = 60;
+
+int detectStrength = 0;
+
 //global counter
 int i = 0;
 
@@ -98,6 +105,10 @@ int vibeDetectionGlobalFrameCompletion = 0;
 int mogDetection1GlobalFrameCompletion = 0;
 int mogDetection2GlobalFrameCompletion = 0;
 int medianDetectionGlobalFrameCompletion = 0;
+
+double learnedLASMDistance = 0;
+double learnedLASMDistanceSum = 0;
+double learnedLASMDistanceAccess = 0;
 
 //background subtraction models
 Ptr<BackgroundSubtractorGMG> backgroundSubtractorGMM = Algorithm::create<
@@ -378,17 +389,17 @@ int main() {
 		//saving FPS values
 		FPS.push_back(strActiveTimeDifference);
 
-		welcome("Running Computer Vision -> " + to_string(i));
+		welcome("Running Computer Vision -> FN:  " + to_string(i));
 
 		//running Computer Vision
 		objectDetection(FRAME_RATE);
 
-		welcome("Starting Tracking ML -> " + to_string(i));
+		welcome("Starting Tracking ML -> FN: " + to_string(i));
 
 		//running Tracking ML
 		trackingML();
 
-		welcome("Finished Tracking ML -> " + to_string(i));
+		welcome("Finished Tracking ML -> FN: " + to_string(i));
 
 		//display frame number
 		cout << "Currently processing frame number " << i << "." << endl;

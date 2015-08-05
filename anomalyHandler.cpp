@@ -45,7 +45,7 @@ using namespace std;
 using namespace cv;
 
 //anomaly handler to reduce false-positives
-void anomalyHandler(bool detected, bool finishing)
+void anomalyHandler(int detectStrength, bool finishing)
 {
 	extern int lastAnomalyDetectedFN;
 	extern int numberOfAnomaliesDetected;
@@ -53,14 +53,14 @@ void anomalyHandler(bool detected, bool finishing)
 	extern string fileTime;
 	extern vector<Mat> globalFrames;
 
-	const int anomalyMemory = 20;
+	const int anomalyMemory = 45;
 	const int anomalyCountThreshold = 10;
 
 	//if not in exiting zone
 	if(!finishing)
 	{
 		//if detected anomaly
-		if(detected)
+		if(detectStrength >= 2)
 		{
 			//last anomaly detected
 			lastAnomalyDetectedFN = i;

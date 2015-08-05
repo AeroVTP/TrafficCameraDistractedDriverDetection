@@ -54,8 +54,11 @@ void analyzeMovement()
 	const int yDisplacementThreshold = 20;
 
 	//booleans to detect anomalies
-	bool detected = false;
-	bool finishing = false;
+ 	bool finishing = false;
+
+	//monitoring detect strength
+	extern int detectStrength;
+	detectStrength = 0;
 
 	extern vector<vector<Point> > vectorOfDetectedCars;
 	extern Mat backgroundFrameMedianColor;
@@ -267,7 +270,7 @@ void analyzeMovement()
 						CV_AA, false);
 
 				//flag is detected
-				detected = true;
+				detectStrength++;
 
 				//aggregate number of anomalies detected
 				numberOfAnomaliesDetected++;
@@ -301,7 +304,7 @@ void analyzeMovement()
 						CV_AA, false);
 
 				//flag is detected
-				detected = true;
+				detectStrength++;
 
 				//aggregate number of anomalies detected
 				numberOfAnomaliesDetected++;
@@ -351,7 +354,7 @@ void analyzeMovement()
 						<< endl;
 
 				//flag is detected
-				detected = true;
+				detectStrength++;
 
 				//aggregate number of anomalies detected
 				numberOfAnomaliesDetected++;
@@ -384,6 +387,6 @@ void analyzeMovement()
 	}
 
 	//start anomaly handler
-	anomalyHandler(detected, false);
+	anomalyHandler(detectStrength, false);
 }
 

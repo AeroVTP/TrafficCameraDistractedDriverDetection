@@ -68,13 +68,13 @@ void individualTracking() {
 	//if ready to begin registering
 	if (i == (bufferMemory + mlBuffer + 3) || ((carCoordinates.size() == 0) && i > (bufferMemory + mlBuffer)))
 	{
-		registerFirstCar();
+ 		registerFirstCar();
  	}
 
  	//if car is in scene
 	else if (detectedCoordinates.size() > 0) {
 
-		//save into vector
+  		//save into vector
 		vectorOfDetectedCars.push_back(detectedCoordinates);
 		coordinateMemory.push_back(detectedCoordinates);
 

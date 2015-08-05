@@ -45,6 +45,8 @@
 #include "individualTracking.h"
 #include "registerFirstCar.h"
 
+#include "learnedDistanceFromNormal.h"
+
 //LASM method
 void learnedCoordinate()
 {
@@ -55,6 +57,7 @@ void learnedCoordinate()
 	extern int FRAME_WIDTH;
 	extern vector<double> distanceFromNormal;
 	extern vector<Point> distanceFromNormalPoints;
+	extern vector< vector <int> > accessTimesInt;
 
 	//Mat to show model
 	Mat distanceFrame;
@@ -86,6 +89,7 @@ void learnedCoordinate()
 
 			//writing to LASM
 			learnedCoordinates[initialCounter][tmpPoint.x / 7] = averagedPoint;
+			accessTimesInt[initialCounter][tmpPoint.x / 7] = accessTimesInt[initialCounter][tmpPoint.x / 7]  + 1;
 
 			//if LASM changed
 			if(sqrt( abs(existingPoint.x - tmpPoint.x) *
@@ -132,11 +136,18 @@ void learnedCoordinate()
 						//tmp variable to eventually determine number of reads
 						int tmpATI = 2;
 
-						//determining average y
-						int tmp = ((tmpPoint.y +  oldTmpPoint.y)) / tmpATI;
+						tmpATI = accessTimesInt[initialCounter][tmpPoint.x / 7];
 
-						//write averaged values to vector
-						distanceFromNormal.push_back( abs(	tmpPoint.y - tmpPointVector.at(tmpPoint.x / 7).y));
+						//determining average y
+						//int tmp = ((tmpPoint.y +  oldTmpPoint.y)) / tmpATI;
+						double averagedDistanceFromNormal = ((oldTmpPoint.y * tmpATI - 1) + tmpPoint.y) / tmpATI;
+
+						learnedDistanceFromNormal(averagedDistanceFromNormal);
+
+						//learnedDistanceFromNormal(tmpPoint.y - tmpPointVector.at(tmpPoint.x / 7).y);
+
+ 						//write averaged values to vector
+						distanceFromNormal.push_back(abs(	tmpPoint.y - tmpPointVector.at(tmpPoint.x / 7).y));
 						distanceFromNormalPoints.push_back(tmpPoint);
 
 						//writing to frame
@@ -147,7 +158,7 @@ void learnedCoordinate()
 						circle(distanceFrame, tmpPoint, 4, Scalar(254, 254, 0), -1, 8, 0);
 
 						//create averaged points
-						Point averagePoint(v, tmp);
+						Point averagePoint(v, averagedDistanceFromNormal);
 
 						//saving averaged point to vector
 						tmpPointVector.at(tmpPoint.x / 7) = averagePoint;

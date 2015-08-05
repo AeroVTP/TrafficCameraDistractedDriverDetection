@@ -10,6 +10,6 @@
 
 
 //anomaly handler to reduce false-positives
-void anomalyHandler(bool detected, bool finishing);
+void anomalyHandler(int detectStrength, bool finishing);
 
 #endif /* ANOMALYHANDLER_H_ */
