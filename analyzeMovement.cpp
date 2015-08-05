@@ -203,7 +203,7 @@ void analyzeMovement()
 		distanceFromNormal.erase(distanceFromNormal.begin(), distanceFromNormal.end());
 		distanceFromNormalPoints.erase(distanceFromNormalPoints.begin(), distanceFromNormalPoints.end());
 
-		displayFrame("distanceFrameAnomaly", distanceFrameAnomaly, true);
+		displayFrame("distanceFrameAnomaly", distanceFrameAnomaly);
 
 		//average all learned distances
 		learnedDistanceAverage = learnedDistance / learnedDistanceCounter;

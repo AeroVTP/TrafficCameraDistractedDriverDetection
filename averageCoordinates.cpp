@@ -151,7 +151,7 @@ vector <Point> recurseAverageCoordinates(	vector <Point> coordinates, int reps)
 
 //average car points
 vector<Point> averageCoordinates(vector<Point> coordinates, int distanceThreshold) {
-	return recurseAverageCoordinates(coordinates, 1);
+	return recurseAverageCoordinates(coordinates, 2);
 }
 
 

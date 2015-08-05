@@ -4,6 +4,7 @@
  *  Created on: Aug 5, 2015
  *      Author: Vidur
  */
+#include "welcome.h"
 
 using namespace std;
 
@@ -19,16 +20,21 @@ void learnedDistanceFromNormal(double distance)
 	learnedLASMDistanceSum += distance;
 	learnedLASMDistance = learnedLASMDistanceSum / learnedLASMDistanceAccess;
 
-	/*
-	cout << "distance " << distance << endl;
-	cout << "learnedDistance " << learnedLASMDistance << endl;
-	cout << "learnedLASMDistanceAccess" << learnedLASMDistanceAccess << endl;
-	*/
+	const double scalarFactor = distance / learnedLASMDistance;
 
-	if(distance > learnedLASMDistance * 1.25 || distance < learnedLASMDistance * .75)
+	//cout << "Distance " << distance << endl;
+	//cout << "Scalar Factor " << scalarFactor << endl;
+
+	if(scalarFactor  >  1.25)
 	{
 		extern int detectStrength;
+		extern int i;
+		extern int numberOfAnomaliesDetected;
+
 		detectStrength++;
+		cout << "LASM FIRING" << endl;
+		numberOfAnomaliesDetected++;
+		welcome("LASM & LASME ANOMALY -> CONFIRMING SHORTLY FN: " + to_string(i));
 	}
 }
 

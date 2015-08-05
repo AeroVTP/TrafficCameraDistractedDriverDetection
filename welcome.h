@@ -8,6 +8,9 @@
 #ifndef WELCOME_H_
 #define WELCOME_H_
 
+using namespace std;
+using namespace cv;
+
 //display welcome message and splash screen
 void welcome();
 

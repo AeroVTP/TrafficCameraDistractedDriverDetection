@@ -50,6 +50,7 @@ void calculateDeviance() {
 
 	extern Mat backgroundFrameMedianColor;
 	extern vector< vector<Point> > learnedCoordinates;
+	extern double learnedLASMDistance;
 
 	//train LASM
 	learnedCoordinate();
@@ -76,6 +77,11 @@ void calculateDeviance() {
 	        rectangle( tmpToDisplay, tmpPointTopLeft, tmpPointBottomRight, Scalar(255, 255, 0), 1);
 		}
 	}
+	//writing to frame
+	putText(tmpToDisplay, to_string(learnedLASMDistance),
+			Point(10,30), CV_FONT_HERSHEY_SIMPLEX, 1, cvScalar(255, 255, 0), 1,
+			CV_AA, false);
+
 	displayFrame("Learned Path", tmpToDisplay, true);
 
 }
