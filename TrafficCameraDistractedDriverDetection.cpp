@@ -1,7 +1,7 @@
 //======================================================================================================
 // Name        : TrafficCameraDistractedDriverDetection.cpp
 // Author      : Vidur Prasad
-// Version     : 0.6.3
+// Version     : 0.6.4
 // Copyright   : Institute for the Development and Commercialization of Advanced Sensor Technology Inc.
 // Description : Detect Drunk, Distracted, and Anomalous Driving Using Traffic Cameras
 //======================================================================================================
@@ -86,7 +86,7 @@ int FRAME_WIDTH;
 int FRAME_RATE;
 
 //x and y car entry
-int xLimiter = 120;
+int xLimiter = 40;
 int yLimiter = 30;
 int xFarLimiter = 60;
 
@@ -176,7 +176,7 @@ bool objectOFAFirstTime = true;
 int opticalFlowDensityDisplay = 5;
 
 //Buffer memory size
-int bufferMemory = 95;
+int bufferMemory = 90;
 
 //boolean to decide if preprocessed median should be used
 bool readMedianImg = true;

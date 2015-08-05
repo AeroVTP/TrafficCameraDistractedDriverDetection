@@ -13,17 +13,17 @@ void learnedDistanceFromNormal(double distance)
 	extern double learnedLASMDistanceSum;
 	extern double learnedLASMDistanceAccess;
 
-	if(distance != 0)
-	{
-		cout << "distance " << distance << endl;
-		cout << "learnedDistance " << learnedLASMDistance << endl;
-	}
-
 	distance = abs(distance);
 
 	learnedLASMDistanceAccess++;
 	learnedLASMDistanceSum += distance;
-	learnedLASMDistance = learnedLASMDistanceSum / learnedLASMDistance;
+	learnedLASMDistance = learnedLASMDistanceSum / learnedLASMDistanceAccess;
+
+	/*
+	cout << "distance " << distance << endl;
+	cout << "learnedDistance " << learnedLASMDistance << endl;
+	cout << "learnedLASMDistanceAccess" << learnedLASMDistanceAccess << endl;
+	*/
 
 	if(distance > learnedLASMDistance * 1.25 || distance < learnedLASMDistance * .75)
 	{

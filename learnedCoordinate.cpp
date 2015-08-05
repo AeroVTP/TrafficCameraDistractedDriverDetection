@@ -91,10 +91,14 @@ void learnedCoordinate()
 			learnedCoordinates[initialCounter][tmpPoint.x / 7] = averagedPoint;
 			accessTimesInt[initialCounter][tmpPoint.x / 7] = accessTimesInt[initialCounter][tmpPoint.x / 7]  + 1;
 
+			double averagedDistanceFromNormal =	sqrt(abs(existingPoint.x - tmpPoint.x) *
+									abs(existingPoint.y - tmpPoint.y));
+
 			//if LASM changed
-			if(sqrt( abs(existingPoint.x - tmpPoint.x) *
-					abs(existingPoint.y - tmpPoint.y)) != 0)
+			if(averagedDistanceFromNormal != 0)
 			{
+				learnedDistanceFromNormal(averagedDistanceFromNormal);
+
 				//display difference
 				//cout << " DIFFERENCE FROM NORMAL " << to_string(sqrt( abs(existingPoint.x - tmpPoint.x) *
 				//	abs(existingPoint.y - tmpPoint.y))) << endl;
@@ -134,15 +138,15 @@ void learnedCoordinate()
 						Point oldTmpPoint = tmpPointVector.at(tmpPoint.x / 7);
 
 						//tmp variable to eventually determine number of reads
-						int tmpATI = 2;
+						//int tmpATI = 2;
 
-						tmpATI = accessTimesInt[initialCounter][tmpPoint.x / 7];
+						int tmpATI = accessTimesInt[initialCounter][tmpPoint.x / 7];
 
 						//determining average y
 						//int tmp = ((tmpPoint.y +  oldTmpPoint.y)) / tmpATI;
 						double averagedDistanceFromNormal = ((oldTmpPoint.y * tmpATI - 1) + tmpPoint.y) / tmpATI;
 
-						learnedDistanceFromNormal(averagedDistanceFromNormal);
+						//learnedDistanceFromNormal(averagedDistanceFromNormal);
 
 						//learnedDistanceFromNormal(tmpPoint.y - tmpPointVector.at(tmpPoint.x / 7).y);
 

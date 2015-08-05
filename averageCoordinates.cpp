@@ -116,6 +116,7 @@ vector <Point> averageCoordinatesDefinition(vector <Point> coordinates)
 			return destinationCoordinates;
 		}
 
+		/*
 		//if 1 coordinate
 		else if (coordinates.size() > 0) {
  			//return coordinates
@@ -130,6 +131,12 @@ vector <Point> averageCoordinatesDefinition(vector <Point> coordinates)
 			//return vector
 			return coordinates;
 		}
+		*/
+
+		else
+		{
+			return coordinates;
+		}
 }
 
 vector <Point> recurseAverageCoordinates(	vector <Point> coordinates, int reps)
@@ -137,14 +144,14 @@ vector <Point> recurseAverageCoordinates(	vector <Point> coordinates, int reps)
 	for(int v = 0; v < reps; v++)
 	{
 		coordinates  = averageCoordinatesDefinition(coordinates);
-		//drawCoordinates(coordinates, "avgCoordinates" + to_string(v));
+		drawCoordinates(coordinates, "avgCoordinates" + to_string(v));
  	}
 	return coordinates;
 }
 
 //average car points
 vector<Point> averageCoordinates(vector<Point> coordinates, int distanceThreshold) {
-	return recurseAverageCoordinates(coordinates, 3);
+	return recurseAverageCoordinates(coordinates, 1);
 }
 
 
