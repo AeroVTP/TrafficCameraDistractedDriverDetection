@@ -68,6 +68,14 @@ Point averagePoints(vector<Point> coordinates) {
 		return tmpPoint;
 	}
 
+	/*
+	else
+	{
+		return coordinates[0];
+	}
+	*/
+
+
 	//if one point
 	else if (coordinates.size() == 1) {
 		//cout << "ONLY  POINT " << coordinates.size() << endl;
@@ -76,6 +84,7 @@ Point averagePoints(vector<Point> coordinates) {
 		return coordinates[0];
 	}
 
+
 	//if no points
 	else {
 		//cout << "ONLY POINT " << coordinates.size() << endl;
@@ -83,6 +92,7 @@ Point averagePoints(vector<Point> coordinates) {
 		//create point
 		return Point(0, 0);
 	}
+
 }
 
 

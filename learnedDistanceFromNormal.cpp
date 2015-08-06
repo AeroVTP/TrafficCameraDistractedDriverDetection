@@ -32,7 +32,13 @@ void learnedDistanceFromNormal(double distance)
 		extern int numberOfAnomaliesDetected;
 
 		detectStrength++;
+
+		/*
 		cout << "LASM FIRING" << endl;
+		cout << "Distance " << distance << endl;
+		cout << "Scalar Factor " << scalarFactor << endl;
+		*/
+
 		numberOfAnomaliesDetected++;
 		welcome("LASM & LASME ANOMALY -> CONFIRMING SHORTLY FN: " + to_string(i));
 	}

@@ -5,7 +5,6 @@
  *      Author: Vidur
  */
 
-
 //include opencv library files
 #include "opencv2/highgui/highgui.hpp"
 #include <opencv2/objdetect/objdetect.hpp>

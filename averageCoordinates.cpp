@@ -37,6 +37,7 @@
 #include "drawCoordinates.h"
 #include "sortCoordinates.h"
 #include "averagePoints.h"
+#include "scanFinishedAverageCoordinates.h"
 
 //defining contant PI
 #define PI 3.14159265
@@ -96,9 +97,18 @@ vector <Point> averageCoordinatesDefinition(vector <Point> coordinates)
 
 			//if not entered once
 			if (!enteredOnce) {
-				//average all coordinates
-				destinationCoordinates.push_back(averagePoints(pointsToAverage));
+				if(pointsToAverage.size() != 0)
+				{
+					destinationCoordinates.push_back(averagePoints(pointsToAverage));
+				}
+
+				else
+				{
+					destinationCoordinates.push_back(coordinates[coordinates.size()-1]);
+				}
 			}
+
+			//if(1 == 2){}
 
 			//if only 1 point
 			else if (pointsToAverage.size() == 1) {
@@ -116,23 +126,6 @@ vector <Point> averageCoordinatesDefinition(vector <Point> coordinates)
 			return destinationCoordinates;
 		}
 
-		/*
-		//if 1 coordinate
-		else if (coordinates.size() > 0) {
- 			//return coordinates
-			return coordinates;
-		}
-
-		//if no coordinates
-		else {
- 			//create point
-			coordinates.push_back(Point(0, 0));
-
-			//return vector
-			return coordinates;
-		}
-		*/
-
 		else
 		{
 			return coordinates;
@@ -141,17 +134,21 @@ vector <Point> averageCoordinatesDefinition(vector <Point> coordinates)
 
 vector <Point> recurseAverageCoordinates(	vector <Point> coordinates, int reps)
 {
-	for(int v = 0; v < reps; v++)
+	coordinates  = averageCoordinatesDefinition(coordinates);
+
+	for(int v = 1; v < reps; v++)
 	{
-		coordinates  = averageCoordinatesDefinition(coordinates);
-		drawCoordinates(coordinates, "avgCoordinates" + to_string(v));
- 	}
+		if(!scanFinishedAverageCoordinates(coordinates))
+		{
+			coordinates  = averageCoordinatesDefinition(coordinates);
+		}
+  	}
 	return coordinates;
 }
 
 //average car points
 vector<Point> averageCoordinates(vector<Point> coordinates, int distanceThreshold) {
-	return recurseAverageCoordinates(coordinates, 2);
+	return recurseAverageCoordinates(coordinates, 10);
 }
 
 

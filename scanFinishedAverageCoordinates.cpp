@@ -1,7 +1,7 @@
 /*
- * processCoordinates.cpp
+ * scanFinishedAverageCoordinates.cpp
  *
- *  Created on: Aug 3, 2015
+ *  Created on: Aug 6, 2015
  *      Author: Vidur
  */
 
@@ -40,33 +40,47 @@
 #include "displayFrame.h"
 #include "welcome.h"
 #include "displayCoordinate.h"
-#include "displayCoordinates.h"
-#include "drawCoordinates.h"
+#include "processCoordinates.h"
+#include "individualTracking.h"
+#include "registerFirstCar.h"
+#include "sortCoordinates.h"
+#include "distanceCoordinates.h"
 
-//method to handle coordinates
-void processCoordinates() {
+using namespace std;
+using namespace cv;
 
-	extern String fileTime;
-	extern Mat finalTrackingFrame;
-	extern vector<Point> detectedCoordinates;
-	extern int numberOfCars;
+bool scanFinishedAverageCoordinates(vector <Point> coordinates)
+{
+	if(coordinates.size() > 1)
+	{
+		const double distanceThreshold = 50;
 
-	const int averageThreshold = 85;
+		double minimumDistance = INT_MAX;
+		coordinates = sortCoordinates(coordinates);
 
-	//draw raw coordinates
-	drawCoordinates(detectedCoordinates, "Raw Detect");
+		for( int v = 0; v < coordinates.size() - 1; v++)
+		{
+			double distance = distanceCoordinates(coordinates[v], coordinates[v+1]);
+			if(minimumDistance > distance)
+			{
+				minimumDistance = distance;
+			}
+		}
 
-	//write to file
-	imwrite(fileTime + "finalTrackingFrame.TIFF", finalTrackingFrame);
-
-	//average points using threshold
-	detectedCoordinates = averageCoordinates(detectedCoordinates, averageThreshold);
-
-	//count number of cars
-	numberOfCars = detectedCoordinates.size();
-
-	//draw processed coordinates
-	drawCoordinates(detectedCoordinates, "Processed Car Coordinates");
+		if(minimumDistance > distanceThreshold)
+		{
+			return false;
+		}
+		else
+		{
+			return true;
+		}
+	}
+	else
+	{
+		return true;
+	}
 }
+
 
 

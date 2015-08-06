@@ -1,7 +1,7 @@
 /*
- * processCoordinates.cpp
+ * distanceCoordinates.cpp
  *
- *  Created on: Aug 3, 2015
+ *  Created on: Aug 6, 2015
  *      Author: Vidur
  */
 
@@ -40,33 +40,19 @@
 #include "displayFrame.h"
 #include "welcome.h"
 #include "displayCoordinate.h"
-#include "displayCoordinates.h"
-#include "drawCoordinates.h"
+#include "processCoordinates.h"
+#include "individualTracking.h"
+#include "registerFirstCar.h"
 
-//method to handle coordinates
-void processCoordinates() {
+#include "learnedDistanceFromNormal.h"
 
-	extern String fileTime;
-	extern Mat finalTrackingFrame;
-	extern vector<Point> detectedCoordinates;
-	extern int numberOfCars;
+using namespace std;
+using namespace cv;
 
-	const int averageThreshold = 85;
-
-	//draw raw coordinates
-	drawCoordinates(detectedCoordinates, "Raw Detect");
-
-	//write to file
-	imwrite(fileTime + "finalTrackingFrame.TIFF", finalTrackingFrame);
-
-	//average points using threshold
-	detectedCoordinates = averageCoordinates(detectedCoordinates, averageThreshold);
-
-	//count number of cars
-	numberOfCars = detectedCoordinates.size();
-
-	//draw processed coordinates
-	drawCoordinates(detectedCoordinates, "Processed Car Coordinates");
+double distanceCoordinates(Point point1, Point point2)
+{
+	return sqrt( pow( (point1.x - point2.x), 2) + pow((point1.y - point2.y), 2) );
 }
+
 
 

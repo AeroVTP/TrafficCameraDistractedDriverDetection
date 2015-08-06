@@ -1,7 +1,7 @@
 //======================================================================================================
 // Name        : TrafficCameraDistractedDriverDetection.cpp
 // Author      : Vidur Prasad
-// Version     : 0.6.5
+// Version     : 0.6.6
 // Copyright   : Institute for the Development and Commercialization of Advanced Sensor Technology Inc.
 // Description : Detect Drunk, Distracted, and Anomalous Driving Using Traffic Cameras
 //======================================================================================================
